@@ -502,6 +502,32 @@ io::ostream& operator<<(io::ostream& stream, ShaderStageFlags stageFlags) {
     return stream << str;
 }
 
+io::ostream& operator<<(io::ostream& out, CompilerPriorityQueue queue)
+{
+    switch (queue) {
+        CASE(CompilerPriorityQueue, HIGH)
+        CASE(CompilerPriorityQueue, LOW)
+    }
+    return out;
+}
+
+utils::io::ostream& operator<<(io::ostream& out, TextureUsage usage)
+{
+    switch (usage) {
+        CASE(TextureUsage, NONE)
+        CASE(TextureUsage, COLOR_ATTACHMENT)
+        CASE(TextureUsage, DEPTH_ATTACHMENT)
+        CASE(TextureUsage, STENCIL_ATTACHMENT)
+        CASE(TextureUsage, UPLOADABLE)
+        CASE(TextureUsage, SAMPLEABLE)
+        CASE(TextureUsage, SUBPASS_INPUT)
+        CASE(TextureUsage, BLIT_SRC)
+        CASE(TextureUsage, BLIT_DST)
+        CASE(TextureUsage, DEFAULT)
+    }
+    return out;
+}
+
 #undef CASE
 
 #endif // !NDEBUG

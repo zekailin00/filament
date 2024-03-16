@@ -1256,6 +1256,7 @@ utils::io::ostream& operator<<(utils::io::ostream& out, const filament::backend:
 utils::io::ostream& operator<<(utils::io::ostream& out, const filament::backend::RenderPassParams& b);
 utils::io::ostream& operator<<(utils::io::ostream& out, const filament::backend::Viewport& v);
 utils::io::ostream& operator<<(utils::io::ostream& out, filament::backend::ShaderStageFlags stageFlags);
+utils::io::ostream& operator<<(utils::io::ostream& out, filament::backend::CompilerPriorityQueue queue);
 #endif
 
 #endif // TNT_FILAMENT_BACKEND_DRIVERENUMS_H

@@ -20,6 +20,7 @@
 // NOTE: this header should not include STL headers
 
 #include <utils/compiler.h>
+#include <utils/ostream.h>
 
 #include <assert.h>
 #include <stddef.h>
@@ -242,6 +243,11 @@ public:
 
     const_pointer c_str() const noexcept { return mData; }
     pointer c_str() noexcept { return mData; }
+
+    friend io::ostream& operator<<(io::ostream& out, const FixedSizeString& str) {
+        out << str.mData;
+        return out;
+    }
 
 private:
     value_type mData[N] = {0};
