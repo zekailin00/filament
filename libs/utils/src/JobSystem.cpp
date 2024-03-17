@@ -96,6 +96,9 @@ void JobSystem::setThreadName(const char* name) noexcept {
     
     SetThreadDescription(GetCurrentThread(), u16name.data());
 #endif
+#if TRACY_ENABLE
+    tracy::SetThreadName(name);
+#endif
 }
 
 void JobSystem::setThreadPriority(Priority priority) noexcept {
