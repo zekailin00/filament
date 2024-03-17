@@ -22,7 +22,7 @@
 } while(0)
 
 #define SYSTRACE_NAME_BEGIN(name) do {          \
-    TracyCZone(ctx, 1);                         \
+    TracyCZoneN(ctx, name, 1);                  \
     tracyCtxStack.push(ctx);                    \
 } while(0)
 
