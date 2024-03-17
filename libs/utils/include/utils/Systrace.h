@@ -41,6 +41,8 @@
 #include <utils/android/Systrace.h>
 #elif defined(__APPLE__) && FILAMENT_APPLE_SYSTRACE
 #include <utils/darwin/Systrace.h>
+#elif defined(TRACY_ENABLE)
+#include <utils/generic/Systrace.h>
 #else
 
 #define SYSTRACE_ENABLE()

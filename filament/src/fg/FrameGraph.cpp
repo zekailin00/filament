@@ -193,7 +193,8 @@ void FrameGraph::execute(backend::DriverApi& driver) noexcept {
         first++;
         assert_invariant(!node->isCulled());
 
-        SYSTRACE_NAME(node->getName());
+        SYSTRACE_NAME("FrameGraph");
+        SYSTRACE_TEXT(node->getName());
 
         driver.pushGroupMarker(node->getName());
 

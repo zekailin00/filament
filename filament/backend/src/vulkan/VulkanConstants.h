@@ -91,9 +91,17 @@ static_assert(FVK_ENABLED(FVK_DEBUG_GROUP_MARKERS));
 
 #include <utils/Systrace.h>
 
+#if TRACY_ENABLE
+#define FVK_SYSTRACE_CONTEXT()      SYSTRACE_CONTEXT()
+#define FVK_SYSTRACE_START(marker)  SYSTRACE_NAME(marker)
+#define FVK_SYSTRACE_END()          
+
+#else
 #define FVK_SYSTRACE_CONTEXT()      SYSTRACE_CONTEXT()
 #define FVK_SYSTRACE_START(marker)  SYSTRACE_NAME_BEGIN(marker)
 #define FVK_SYSTRACE_END()          SYSTRACE_NAME_END()
+#endif
+
 #else
 #define FVK_SYSTRACE_CONTEXT()
 #define FVK_SYSTRACE_START(marker)

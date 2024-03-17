@@ -45,6 +45,8 @@ option(FILAMENT_ENABLE_TSAN "Enable Thread Sanitizer" OFF)
 
 option(FILAMENT_ENABLE_FEATURE_LEVEL_0 "Enable Feature Level 0" ON)
 
+option(TRACY_ENABLE "Enable Tracy profiler for Systrace" ON)
+
 set(FILAMENT_NDK_VERSION "" CACHE STRING
     "Android NDK version or version prefix to be used when building for Android."
 )
@@ -498,6 +500,9 @@ else()
 endif()
 if (FILAMENT_SUPPORTS_VULKAN)
     add_definitions(-DFILAMENT_DRIVER_SUPPORTS_VULKAN)
+    if (FILAMENT_VKLIBRARY_PATH)
+        add_definitions(-DFILAMENT_VKLIBRARY_PATH=\"${FILAMENT_VKLIBRARY_PATH}\")
+    endif()
 endif()
 
 # Build with Metal support on non-WebGL Apple platforms.
@@ -715,6 +720,7 @@ endfunction()
 # ==================================================================================================
 
 # Common to all platforms
+add_subdirectory(${EXTERNAL}/tracy)
 add_subdirectory(${EXTERNAL}/libgtest/tnt)
 add_subdirectory(${LIBRARIES}/camutils)
 add_subdirectory(${LIBRARIES}/filabridge)
