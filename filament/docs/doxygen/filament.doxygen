@@ -8,7 +8,7 @@ PROJECT_NAME           = "Filament"
 PROJECT_NUMBER         =
 PROJECT_BRIEF          = "A real time, physically-based renderer (PBR)"
 PROJECT_LOGO           =
-OUTPUT_DIRECTORY       = docs
+OUTPUT_DIRECTORY       = docs/detailed
 CREATE_SUBDIRS         = NO
 ALLOW_UNICODE_NAMES    = NO
 OUTPUT_LANGUAGE        = English
@@ -61,10 +61,10 @@ LOOKUP_CACHE_SIZE      = 0
 #---------------------------------------------------------------------------
 # Build related configuration options
 #---------------------------------------------------------------------------
-EXTRACT_ALL            = NO
-EXTRACT_PRIVATE        = NO
-EXTRACT_PACKAGE        = NO
-EXTRACT_STATIC         = NO
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = YES
+EXTRACT_PACKAGE        = YES
+EXTRACT_STATIC         = YES
 EXTRACT_LOCAL_CLASSES  = YES
 EXTRACT_LOCAL_METHODS  = YES
 EXTRACT_ANON_NSPACES   = NO
@@ -112,13 +112,18 @@ WARN_LOGFILE           =
 #---------------------------------------------------------------------------
 # Configuration options related to the input files
 #---------------------------------------------------------------------------
-INPUT                  = ../libs/filabridge/include \
-                         ../libs/filamat/include \
-                         ../libs/geometry/include \
-                         ../libs/gltfio/include \
-                         ../libs/utils/include \
-                         backend/include \
-                         include
+INPUT                  = ../libs/filabridge     \
+                         ../libs/filamat        \
+                         ../libs/geometry       \
+                         ../libs/gltfio         \
+                         ../libs/utils          \
+                         ../tools/cmgen         \
+                         ../tools/filamesh      \
+                         ../tools/matc          \
+                         backend                \
+                         include                \
+                         src                    \
+                         ../libs/filamentapp
 
 INPUT_ENCODING         = UTF-8
 FILE_PATTERNS          = *.inl \
@@ -127,9 +132,11 @@ FILE_PATTERNS          = *.inl \
                          *.hxx \
                          *.hpp \
                          *.h++ \
-                         *.inc
+                         *.inc \
+                         *.cpp
 RECURSIVE              = YES
-EXCLUDE                =
+EXCLUDE                = */test/* \
+                         */tests/*
 EXCLUDE_SYMLINKS       = NO
 EXCLUDE_PATTERNS       =
 EXCLUDE_SYMBOLS        =
@@ -307,26 +314,26 @@ PERL_PATH              = /usr/bin/perl
 CLASS_DIAGRAMS         = YES
 MSCGEN_PATH            =
 DIA_PATH               =
-HIDE_UNDOC_RELATIONS   = YES
+HIDE_UNDOC_RELATIONS   = NO
 HAVE_DOT               = YES
-DOT_NUM_THREADS        = 0
+DOT_NUM_THREADS        = 12
 DOT_FONTNAME           = Helvetica
 DOT_FONTSIZE           = 10
 DOT_FONTPATH           =
-CLASS_GRAPH            = NO
-COLLABORATION_GRAPH    = NO
+CLASS_GRAPH            = YES
+COLLABORATION_GRAPH    = YES
 GROUP_GRAPHS           = YES
-UML_LOOK               = NO
+UML_LOOK               = YES
 UML_LIMIT_NUM_FIELDS   = 10
-TEMPLATE_RELATIONS     = NO
+TEMPLATE_RELATIONS     = YES
 INCLUDE_GRAPH          = YES
 INCLUDED_BY_GRAPH      = YES
-CALL_GRAPH             = NO
-CALLER_GRAPH           = NO
+CALL_GRAPH             = YES
+CALLER_GRAPH           = YES
 GRAPHICAL_HIERARCHY    = YES
 DIRECTORY_GRAPH        = YES
 DOT_IMAGE_FORMAT       = svg
-INTERACTIVE_SVG        = NO
+INTERACTIVE_SVG        = YES
 DOT_PATH               =
 DOTFILE_DIRS           =
 MSCFILE_DIRS           =
@@ -334,9 +341,9 @@ DIAFILE_DIRS           =
 PLANTUML_JAR_PATH      =
 PLANTUML_CFG_FILE      =
 PLANTUML_INCLUDE_PATH  =
-DOT_GRAPH_MAX_NODES    = 50
-MAX_DOT_GRAPH_DEPTH    = 0
+DOT_GRAPH_MAX_NODES    = 90
+MAX_DOT_GRAPH_DEPTH    = 1
 DOT_TRANSPARENT        = YES
 DOT_MULTI_TARGETS      = NO
-GENERATE_LEGEND        = NO
+GENERATE_LEGEND        = YES
 DOT_CLEANUP            = YES
