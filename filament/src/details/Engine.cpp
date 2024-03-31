@@ -148,6 +148,7 @@ void FEngine::create(Engine::Builder const& builder, Invocable<void(void*)>&& ca
 }
 
 FEngine* FEngine::getEngine(void* token) {
+    SYSTRACE_CALL();
 
     FEngine* instance = static_cast<FEngine*>(token);
 
@@ -208,6 +209,7 @@ FEngine::FEngine(Engine::Builder const& builder) :
         mMainThreadId(ThreadUtils::getThreadId()),
         mConfig(builder->mConfig)
 {
+    SYSTRACE_CALL();
     // we're assuming we're on the main thread here.
     // (it may not be the case)
     mJobSystem.adopt();
@@ -549,6 +551,7 @@ void FEngine::prepare() {
 }
 
 void FEngine::gc() {
+    SYSTRACE_CALL();
     // Note: this runs in a Job
     auto& em = mEntityManager;
     mRenderableManager.gc(em);
@@ -558,11 +561,13 @@ void FEngine::gc() {
 }
 
 void FEngine::flush() {
+    SYSTRACE_CALL();
     // flush the command buffer
     flushCommandBuffer(mCommandBufferQueue);
 }
 
 void FEngine::flushAndWait() {
+    SYSTRACE_CALL();
 
 #if defined(__ANDROID__)
 
@@ -612,6 +617,7 @@ void FEngine::flushAndWait() {
 // -----------------------------------------------------------------------------------------------
 
 int FEngine::loop() {
+    SYSTRACE_CALL();
     if (mPlatform == nullptr) {
         mPlatform = PlatformFactory::create(&mBackend);
         mOwnPlatform = true;
@@ -685,11 +691,13 @@ int FEngine::loop() {
 }
 
 void FEngine::flushCommandBuffer(CommandBufferQueue& commandQueue) {
+    SYSTRACE_CALL();
     getDriver().purge();
     commandQueue.flush();
 }
 
 const FMaterial* FEngine::getSkyboxMaterial() const noexcept {
+    SYSTRACE_CALL();
     FMaterial const* material = mSkyboxMaterial;
     if (UTILS_UNLIKELY(material == nullptr)) {
         material = FSkybox::createMaterial(*const_cast<FEngine*>(this));
@@ -708,6 +716,7 @@ const FMaterial* FEngine::getSkyboxMaterial() const noexcept {
 
 template<typename T>
 inline T* FEngine::create(ResourceList<T>& list, typename T::Builder const& builder) noexcept {
+    SYSTRACE_CALL();
     T* p = mHeapAllocator.make<T>(*this, builder);
     if (UTILS_UNLIKELY(p)) { // this should never happen
         list.insert(p);
@@ -772,6 +781,7 @@ FRenderTarget* FEngine::createRenderTarget(const RenderTarget::Builder& builder)
  */
 
 FRenderer* FEngine::createRenderer() noexcept {
+    SYSTRACE_CALL();
     FRenderer* p = mHeapAllocator.make<FRenderer>(*this);
     if (UTILS_UNLIKELY(p)) { // should never happen
         mRenderers.insert(p);
@@ -781,6 +791,7 @@ FRenderer* FEngine::createRenderer() noexcept {
 
 FMaterialInstance* FEngine::createMaterialInstance(const FMaterial* material,
         const FMaterialInstance* other, const char* name) noexcept {
+    SYSTRACE_CALL();
     FMaterialInstance* p = mHeapAllocator.make<FMaterialInstance>(*this, other, name);
     if (UTILS_UNLIKELY(p)) { // should never happen
         auto pos = mMaterialInstances.emplace(material, "MaterialInstance");
@@ -794,6 +805,7 @@ FMaterialInstance* FEngine::createMaterialInstance(const FMaterial* material,
  */
 
 FScene* FEngine::createScene() noexcept {
+    SYSTRACE_CALL();
     FScene* p = mHeapAllocator.make<FScene>(*this);
     if (UTILS_UNLIKELY(p)) { // should never happen
         mScenes.insert(p);
@@ -802,6 +814,7 @@ FScene* FEngine::createScene() noexcept {
 }
 
 FView* FEngine::createView() noexcept {
+    SYSTRACE_CALL();
     FView* p = mHeapAllocator.make<FView>(*this);
     if (UTILS_UNLIKELY(p)) { // should never happen
         mViews.insert(p);
@@ -810,6 +823,7 @@ FView* FEngine::createView() noexcept {
 }
 
 FFence* FEngine::createFence() noexcept {
+    SYSTRACE_CALL();
     FFence* p = mHeapAllocator.make<FFence>(*this);
     if (UTILS_UNLIKELY(p)) { // should never happen
         std::lock_guard const guard(mFenceListLock);
@@ -819,6 +833,7 @@ FFence* FEngine::createFence() noexcept {
 }
 
 FSwapChain* FEngine::createSwapChain(void* nativeWindow, uint64_t flags) noexcept {
+    SYSTRACE_CALL();
     if (UTILS_UNLIKELY(flags & backend::SWAP_CHAIN_CONFIG_APPLE_CVPIXELBUFFER)) {
         // If this flag is set, then the nativeWindow is a CVPixelBufferRef.
         // The call to setupExternalImage is synchronous, and allows the driver to take ownership of
@@ -834,6 +849,7 @@ FSwapChain* FEngine::createSwapChain(void* nativeWindow, uint64_t flags) noexcep
 }
 
 FSwapChain* FEngine::createSwapChain(uint32_t width, uint32_t height, uint64_t flags) noexcept {
+    SYSTRACE_CALL();
     FSwapChain* p = mHeapAllocator.make<FSwapChain>(*this, width, height, flags);
     if (p) {
         mSwapChains.insert(p);
@@ -847,20 +863,24 @@ FSwapChain* FEngine::createSwapChain(uint32_t width, uint32_t height, uint64_t f
 
 
 FCamera* FEngine::createCamera(Entity entity) noexcept {
+    SYSTRACE_CALL();
     return mCameraManager.create(*this, entity);
 }
 
 FCamera* FEngine::getCameraComponent(Entity entity) noexcept {
+    SYSTRACE_CALL();
     auto ci = mCameraManager.getInstance(entity);
     return ci ? mCameraManager.getCamera(ci) : nullptr;
 }
 
 void FEngine::destroyCameraComponent(utils::Entity entity) noexcept {
+    SYSTRACE_CALL();
     mCameraManager.destroy(*this, entity);
 }
 
 
 void FEngine::createRenderable(const RenderableManager::Builder& builder, Entity entity) {
+    SYSTRACE_CALL();
     mRenderableManager.create(builder, entity);
     auto& tcm = mTransformManager;
     // if this entity doesn't have a transform component, add one.
@@ -870,6 +890,7 @@ void FEngine::createRenderable(const RenderableManager::Builder& builder, Entity
 }
 
 void FEngine::createLight(const LightManager::Builder& builder, Entity entity) {
+    SYSTRACE_CALL();
     mLightManager.create(builder, entity);
 }
 
@@ -878,6 +899,7 @@ void FEngine::createLight(const LightManager::Builder& builder, Entity entity) {
 template<typename T>
 UTILS_NOINLINE
 void FEngine::cleanupResourceList(ResourceList<T>&& list) {
+    SYSTRACE_CALL();
     if (UTILS_UNLIKELY(!list.empty())) {
 #ifndef NDEBUG
         slog.d << "cleaning up " << list.size()
@@ -893,6 +915,7 @@ void FEngine::cleanupResourceList(ResourceList<T>&& list) {
 template<typename T, typename Lock>
 UTILS_NOINLINE
 void FEngine::cleanupResourceListLocked(Lock& lock, ResourceList<T>&& list) {
+    SYSTRACE_CALL();
     // copy the list with the lock held, then proceed as usual
     lock.lock();
     auto copy(std::move(list));
@@ -911,6 +934,7 @@ inline bool FEngine::isValid(const T* ptr, ResourceList<T>& list) {
 template<typename T>
 UTILS_ALWAYS_INLINE
 inline bool FEngine::terminateAndDestroy(const T* ptr, ResourceList<T>& list) {
+    SYSTRACE_CALL();
     if (ptr == nullptr) return true;
     bool const success = list.remove(ptr);
 
@@ -932,6 +956,7 @@ inline bool FEngine::terminateAndDestroy(const T* ptr, ResourceList<T>& list) {
 template<typename T, typename Lock>
 UTILS_ALWAYS_INLINE
 inline bool FEngine::terminateAndDestroyLocked(Lock& lock, const T* ptr, ResourceList<T>& list) {
+    SYSTRACE_CALL();
     if (ptr == nullptr) return true;
     lock.lock();
     bool const success = list.remove(ptr);
@@ -1041,6 +1066,7 @@ bool FEngine::destroy(const FInstanceBuffer* p){
 
 UTILS_NOINLINE
 bool FEngine::destroy(const FMaterial* ptr) {
+    SYSTRACE_CALL();
     if (ptr == nullptr) return true;
     auto pos = mMaterialInstances.find(ptr);
     if (pos != mMaterialInstances.cend()) {
@@ -1056,6 +1082,7 @@ bool FEngine::destroy(const FMaterial* ptr) {
 
 UTILS_NOINLINE
 bool FEngine::destroy(const FMaterialInstance* ptr) {
+    SYSTRACE_CALL();
     if (ptr == nullptr) return true;
     auto pos = mMaterialInstances.find(ptr->getMaterial());
     assert_invariant(pos != mMaterialInstances.cend());
@@ -1069,6 +1096,7 @@ bool FEngine::destroy(const FMaterialInstance* ptr) {
 
 UTILS_NOINLINE
 void FEngine::destroy(Entity e) {
+    SYSTRACE_CALL();
     mRenderableManager.destroy(e);
     mLightManager.destroy(e);
     mTransformManager.destroy(e);
@@ -1149,6 +1177,7 @@ bool FEngine::isValid(const FInstanceBuffer* p) {
 
 
 void* FEngine::streamAlloc(size_t size, size_t alignment) noexcept {
+    SYSTRACE_CALL();
     // we allow this only for small allocations
     if (size > 65536) {
         return nullptr;
@@ -1157,6 +1186,7 @@ void* FEngine::streamAlloc(size_t size, size_t alignment) noexcept {
 }
 
 bool FEngine::execute() {
+    SYSTRACE_CALL();
     // wait until we get command buffers to be executed (or thread exit requested)
     auto buffers = mCommandBufferQueue.waitForCommands();
     if (UTILS_UNLIKELY(buffers.empty())) {
@@ -1176,6 +1206,7 @@ bool FEngine::execute() {
 }
 
 void FEngine::destroy(FEngine* engine) {
+    SYSTRACE_CALL();
     if (engine) {
         engine->shutdown();
         delete engine;
@@ -1183,11 +1214,13 @@ void FEngine::destroy(FEngine* engine) {
 }
 
 Engine::FeatureLevel FEngine::getSupportedFeatureLevel() const noexcept {
+    SYSTRACE_CALL();
     FEngine::DriverApi& driver = const_cast<FEngine*>(this)->getDriverApi();
     return driver.getFeatureLevel();
 }
 
 Engine::FeatureLevel FEngine::setActiveFeatureLevel(FeatureLevel featureLevel) {
+    SYSTRACE_CALL();
     ASSERT_PRECONDITION(featureLevel <= getSupportedFeatureLevel(),
             "Feature level %u not supported", (unsigned)featureLevel);
     ASSERT_PRECONDITION(mActiveFeatureLevel >= FeatureLevel::FEATURE_LEVEL_1,

@@ -47,6 +47,7 @@ using namespace filament::math;
 namespace filament::backend {
 
 DriverBase::DriverBase() noexcept {
+    SYSTRACE_CALL();
     if constexpr (UTILS_HAS_THREADING) {
         // This thread services user callbacks
         mServiceThread = std::thread([this]() {
@@ -75,6 +76,7 @@ DriverBase::DriverBase() noexcept {
 }
 
 DriverBase::~DriverBase() noexcept {
+    SYSTRACE_CALL();
     assert_invariant(mCallbacks.empty());
     assert_invariant(mServiceThreadCallbackQueue.empty());
     if constexpr (UTILS_HAS_THREADING) {
@@ -97,17 +99,20 @@ public:
 };
 
 DriverBase::CallbackData* DriverBase::CallbackData::obtain(DriverBase* allocator) {
+    SYSTRACE_CALL();
     // todo: use a pool
     return new CallbackDataDetails(allocator);
 }
 
 void DriverBase::CallbackData::release(CallbackData* data) {
+    SYSTRACE_CALL();
     // todo: use a pool
     delete static_cast<CallbackDataDetails*>(data);
 }
 
 
 void DriverBase::scheduleCallback(CallbackHandler* handler, void* user, CallbackHandler::Callback callback) {
+    SYSTRACE_CALL();
     if (handler && UTILS_HAS_THREADING) {
         std::lock_guard<std::mutex> const lock(mServiceThreadLock);
         mServiceThreadCallbackQueue.emplace_back(handler, callback, user);
@@ -119,6 +124,7 @@ void DriverBase::scheduleCallback(CallbackHandler* handler, void* user, Callback
 }
 
 void DriverBase::purge() noexcept {
+    SYSTRACE_CALL();
     decltype(mCallbacks) callbacks;
     std::unique_lock<std::mutex> lock(mPurgeLock);
     std::swap(callbacks, mCallbacks);
@@ -131,6 +137,7 @@ void DriverBase::purge() noexcept {
 // ------------------------------------------------------------------------------------------------
 
 void DriverBase::scheduleDestroySlow(BufferDescriptor&& buffer) noexcept {
+    SYSTRACE_CALL();
     auto const handler = buffer.getHandler();
     scheduleCallback(handler, [buffer = std::move(buffer)]() {
         // user callback is called when BufferDescriptor gets destroyed
@@ -140,6 +147,7 @@ void DriverBase::scheduleDestroySlow(BufferDescriptor&& buffer) noexcept {
 // This is called from an async driver method so it's in the GL thread, but purge is called
 // on the user thread. This is typically called 0 or 1 times per frame.
 void DriverBase::scheduleRelease(AcquiredImage const& image) noexcept {
+    SYSTRACE_CALL();
     scheduleCallback(image.handler, [image]() {
         image.callback(image.image, image.userData);
     });
@@ -215,6 +223,7 @@ size_t Driver::getElementTypeSize(ElementType type) noexcept {
 Driver::~Driver() noexcept = default;
 
 void Driver::execute(std::function<void(void)> const& fn) noexcept {
+    SYSTRACE_CALL();
     fn();
 }
 

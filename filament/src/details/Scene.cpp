@@ -450,12 +450,15 @@ void FScene::updateUBOs(
 }
 
 void FScene::terminate(FEngine&) {
+    SYSTRACE_CALL();
     // DO NOT destroy this UBO, it's owned by the View
     mRenderableViewUbh.clear();
 }
 
 void FScene::prepareDynamicLights(const CameraInfo& camera, ArenaScope&,
         Handle<HwBufferObject> lightUbh) noexcept {
+    SYSTRACE_CALL();
+
     FEngine::DriverApi& driver = mEngine.getDriverApi();
     FLightManager const& lcm = mEngine.getLightManager();
     FScene::LightSoa& lightData = getLightData();
@@ -510,6 +513,7 @@ inline void FScene::computeLightRanges(
         float2* UTILS_RESTRICT const zrange,
         CameraInfo const& UTILS_RESTRICT camera,
         float4 const* UTILS_RESTRICT const spheres, size_t count) noexcept {
+    SYSTRACE_CALL();
 
     // without this clang seems to assume the src and dst might overlap even if they're
     // restricted.
@@ -536,16 +540,19 @@ inline void FScene::computeLightRanges(
 
 UTILS_NOINLINE
 void FScene::addEntity(Entity entity) {
+    SYSTRACE_CALL();
     mEntities.insert(entity);
 }
 
 UTILS_NOINLINE
 void FScene::addEntities(const Entity* entities, size_t count) {
+    SYSTRACE_CALL();
     mEntities.insert(entities, entities + count);
 }
 
 UTILS_NOINLINE
 void FScene::remove(Entity entity) {
+    SYSTRACE_CALL();
     mEntities.erase(entity);
 }
 
@@ -558,6 +565,7 @@ void FScene::removeEntities(const Entity* entities, size_t count) {
 
 UTILS_NOINLINE
 size_t FScene::getRenderableCount() const noexcept {
+    SYSTRACE_CALL();
     FEngine& engine = mEngine;
     EntityManager const& em = engine.getEntityManager();
     FRenderableManager const& rcm = engine.getRenderableManager();
@@ -571,6 +579,7 @@ size_t FScene::getRenderableCount() const noexcept {
 
 UTILS_NOINLINE
 size_t FScene::getLightCount() const noexcept {
+    SYSTRACE_CALL();
     FEngine& engine = mEngine;
     EntityManager const& em = engine.getEntityManager();
     FLightManager const& lcm = engine.getLightManager();
@@ -584,11 +593,13 @@ size_t FScene::getLightCount() const noexcept {
 
 UTILS_NOINLINE
 bool FScene::hasEntity(Entity entity) const noexcept {
+    SYSTRACE_CALL();
     return mEntities.find(entity) != mEntities.end();
 }
 
 UTILS_NOINLINE
 void FScene::setSkybox(FSkybox* skybox) noexcept {
+    SYSTRACE_CALL();
     std::swap(mSkybox, skybox);
     if (skybox) {
         remove(skybox->getEntity());
@@ -599,6 +610,7 @@ void FScene::setSkybox(FSkybox* skybox) noexcept {
 }
 
 bool FScene::hasContactShadows() const noexcept {
+    SYSTRACE_CALL();
     // at least some renderables in the scene must have contact-shadows enabled
     // TODO: we should refine this with only the visible ones
     if (!mHasContactShadows) {
@@ -624,6 +636,7 @@ bool FScene::hasContactShadows() const noexcept {
 
 UTILS_NOINLINE
 void FScene::forEach(Invocable<void(Entity)>&& functor) const noexcept {
+    SYSTRACE_CALL();
     std::for_each(mEntities.begin(), mEntities.end(), std::move(functor));
 }
 

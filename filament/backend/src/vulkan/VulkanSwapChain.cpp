@@ -19,6 +19,7 @@
 
 #include <utils/FixedCapacityVector.h>
 #include <utils/Panic.h>
+#include <utils/Systrace.h>
 
 using namespace bluevk;
 using namespace utils;
@@ -38,6 +39,7 @@ VulkanSwapChain::VulkanSwapChain(VulkanPlatform* platform, VulkanContext const& 
       mImageReady(VK_NULL_HANDLE),
       mAcquired(false),
       mIsFirstRenderPass(true) {
+    SYSTRACE_CALL();
     swapChain = mPlatform->createSwapChain(nativeWindow, flags, extent);
     ASSERT_POSTCONDITION(swapChain, "Unable to create swapchain");
 
@@ -56,6 +58,7 @@ VulkanSwapChain::VulkanSwapChain(VulkanPlatform* platform, VulkanContext const& 
 }
 
 VulkanSwapChain::~VulkanSwapChain() {
+    SYSTRACE_CALL();
     // Must wait for the inflight command buffers to finish since they might contain the images
     // we're about to destroy.
     mCommands->flush();
@@ -68,6 +71,7 @@ VulkanSwapChain::~VulkanSwapChain() {
 }
 
 void VulkanSwapChain::update() {
+    SYSTRACE_CALL();
     mColors.clear();
 
     auto const bundle = mPlatform->getSwapChainBundle(swapChain);
@@ -87,6 +91,7 @@ void VulkanSwapChain::update() {
 }
 
 void VulkanSwapChain::present() {
+    SYSTRACE_CALL();
     if (!mHeadless) {
         VkCommandBuffer const cmdbuf = mCommands->get().buffer();
         VkImageSubresourceRange const subresources{
@@ -116,6 +121,7 @@ void VulkanSwapChain::present() {
 }
 
 void VulkanSwapChain::acquire(bool& resized) {
+    SYSTRACE_CALL();
     // It's ok to call acquire multiple times due to it being linked to Driver::makeCurrent().
     if (mAcquired) {
         return;

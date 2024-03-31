@@ -18,28 +18,35 @@
 
 #include "details/Engine.h"
 
+#include <utils/Systrace.h>
+
 namespace filament {
 
 FSwapChain::FSwapChain(FEngine& engine, void* nativeWindow, uint64_t flags)
         : mEngine(engine), mNativeWindow(nativeWindow), mConfigFlags(flags) {
+    SYSTRACE_CALL();
     mSwapChain = engine.getDriverApi().createSwapChain(nativeWindow, flags);
 }
 
 FSwapChain::FSwapChain(FEngine& engine, uint32_t width, uint32_t height, uint64_t flags)
         : mEngine(engine), mConfigFlags(flags) {
+    SYSTRACE_CALL();
     mSwapChain = engine.getDriverApi().createSwapChainHeadless(width, height, flags);
 }
 
 void FSwapChain::terminate(FEngine& engine) noexcept {
+    SYSTRACE_CALL();
     engine.getDriverApi().destroySwapChain(mSwapChain);
 }
 
 void FSwapChain::setFrameScheduledCallback(FrameScheduledCallback callback, void* user) {
+    SYSTRACE_CALL();
     mEngine.getDriverApi().setFrameScheduledCallback(mSwapChain, callback, user);
 }
 
 void FSwapChain::setFrameCompletedCallback(backend::CallbackHandler* handler,
                 utils::Invocable<void(SwapChain*)>&& callback) noexcept {
+    SYSTRACE_CALL();
     struct Callback {
         utils::Invocable<void(SwapChain*)> f;
         SwapChain* s;
@@ -59,6 +66,7 @@ void FSwapChain::setFrameCompletedCallback(backend::CallbackHandler* handler,
 }
 
 bool FSwapChain::isSRGBSwapChainSupported(FEngine& engine) noexcept {
+    SYSTRACE_CALL();
     return engine.getDriverApi().isSRGBSwapChainSupported();
 }
 

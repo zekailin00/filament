@@ -32,7 +32,7 @@
 #define DEBUG_LEVEL_SYSTRACE   1
 
 // set to the desired debug level
-#define DEBUG_LEVEL             DEBUG_LEVEL_NONE
+#define DEBUG_LEVEL             DEBUG_LEVEL_SYSTRACE
 
 
 #if DEBUG_LEVEL == DEBUG_LEVEL_NONE

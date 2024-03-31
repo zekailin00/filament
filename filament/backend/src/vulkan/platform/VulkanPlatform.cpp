@@ -23,6 +23,7 @@
 
 #include <bluevk/BlueVK.h>
 #include <utils/PrivateImplementation-impl.h>
+#include <utils/Systrace.h>
 
 #define SWAPCHAIN_RET_FUNC(func, handle, ...)                                                      \
     if (mImpl->mSurfaceSwapChains.find(handle) != mImpl->mSurfaceSwapChains.end()) {               \
@@ -78,6 +79,7 @@ FixedCapacityVector<const char*> getEnabledLayers() {
 #endif // FVK_EANBLED(FVK_DEBUG_VALIDATION)
 
 void printDeviceInfo(VkInstance instance, VkPhysicalDevice device) {
+    SYSTRACE_CALL();
     // Print some driver or MoltenVK information if it is available.
     if (vkGetPhysicalDeviceProperties2KHR) {
         VkPhysicalDeviceDriverProperties driverProperties = {
@@ -152,6 +154,7 @@ void printDepthFormats(VkPhysicalDevice device) {
 #endif
 
 ExtensionSet getInstanceExtensions() {
+    SYSTRACE_CALL();
     std::string_view const TARGET_EXTS[] = {
             // Request all cross-platform extensions.
             VK_KHR_SURFACE_EXTENSION_NAME,
@@ -180,6 +183,7 @@ ExtensionSet getInstanceExtensions() {
 }
 
 ExtensionSet getDeviceExtensions(VkPhysicalDevice device) {
+    SYSTRACE_CALL();
     std::string_view const TARGET_EXTS[] = {
             VK_EXT_DEBUG_MARKER_EXTENSION_NAME,
             VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME,
@@ -203,6 +207,7 @@ ExtensionSet getDeviceExtensions(VkPhysicalDevice device) {
 }
 
 VkInstance createInstance(ExtensionSet const& requiredExts) {
+    SYSTRACE_CALL();
     VkInstance instance;
     VkInstanceCreateInfo instanceCreateInfo = {};
     bool validationFeaturesSupported = false;
@@ -283,6 +288,7 @@ VkInstance createInstance(ExtensionSet const& requiredExts) {
 VkDevice createLogicalDevice(VkPhysicalDevice physicalDevice,
         const VkPhysicalDeviceFeatures& features, uint32_t graphicsQueueFamilyIndex,
         const ExtensionSet& deviceExtensions) {
+    SYSTRACE_CALL();
     VkDevice device;
     VkDeviceQueueCreateInfo deviceQueueCreateInfo[1] = {};
     const float queuePriority[] = {1.0f};
@@ -335,6 +341,7 @@ VkDevice createLogicalDevice(VkPhysicalDevice physicalDevice,
 // driver/device workarounds).
 std::tuple<ExtensionSet, ExtensionSet> pruneExtensions(VkPhysicalDevice device,
         ExtensionSet const& instExts, ExtensionSet const& deviceExts) {
+    SYSTRACE_CALL();
     ExtensionSet newInstExts = instExts;
     ExtensionSet newDeviceExts = deviceExts;
     if (vkGetPhysicalDeviceProperties2KHR) {
@@ -373,6 +380,7 @@ std::tuple<ExtensionSet, ExtensionSet> pruneExtensions(VkPhysicalDevice device,
 
 FixedCapacityVector<VkQueueFamilyProperties> getPhysicalDeviceQueueFamilyPropertiesHelper(
         VkPhysicalDevice device) {
+    SYSTRACE_CALL();
     uint32_t queueFamiliesCount;
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamiliesCount, nullptr);
     FixedCapacityVector<VkQueueFamilyProperties> queueFamiliesProperties(queueFamiliesCount);
@@ -384,6 +392,7 @@ FixedCapacityVector<VkQueueFamilyProperties> getPhysicalDeviceQueueFamilyPropert
 }
 
 uint32_t identifyGraphicsQueueFamilyIndex(VkPhysicalDevice physicalDevice) {
+    SYSTRACE_CALL();
     const FixedCapacityVector<VkQueueFamilyProperties> queueFamiliesProperties
             = getPhysicalDeviceQueueFamilyPropertiesHelper(physicalDevice);
     uint32_t graphicsQueueFamilyIndex = INVALID_VK_INDEX;
@@ -401,6 +410,7 @@ uint32_t identifyGraphicsQueueFamilyIndex(VkPhysicalDevice physicalDevice) {
 // Enum based on:
 // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceType.html
 inline int deviceTypeOrder(VkPhysicalDeviceType deviceType) {
+    SYSTRACE_CALL();
     switch (deviceType) {
         case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
             return 5;
@@ -421,6 +431,7 @@ inline int deviceTypeOrder(VkPhysicalDeviceType deviceType) {
 
 VkPhysicalDevice selectPhysicalDevice(VkInstance instance,
         VulkanPlatform::Customization::GPUPreference const& gpuPreference) {
+    SYSTRACE_CALL();
     FixedCapacityVector<VkPhysicalDevice> const physicalDevices =
             filament::backend::enumerate(vkEnumeratePhysicalDevices, instance);
     struct DeviceInfo {
@@ -509,6 +520,7 @@ VkPhysicalDevice selectPhysicalDevice(VkInstance instance,
 }
 
 VkFormatList findAttachmentDepthFormats(VkPhysicalDevice device) {
+    SYSTRACE_CALL();
     VkFormatFeatureFlags const features = VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
     // The ordering here indicates the preference of choosing depth+stencil format.
@@ -554,6 +566,7 @@ struct VulkanPlatformPrivate {
 };
 
 void VulkanPlatform::terminate() {
+    SYSTRACE_CALL();
     for (auto swapchain: mImpl->mHeadlessSwapChains) {
         delete static_cast<VulkanPlatformHeadlessSwapChain*>(swapchain);
     }
@@ -573,6 +586,7 @@ void VulkanPlatform::terminate() {
 // This is the main entry point for context creation.
 Driver* VulkanPlatform::createDriver(void* sharedContext,
         const Platform::DriverConfig& driverConfig) noexcept {
+    SYSTRACE_CALL();
     // Load Vulkan entry points.
     ASSERT_POSTCONDITION(bluevk::initialize(), "BlueVK is unable to load entry points.");
 
@@ -693,27 +707,33 @@ VulkanPlatform::VulkanPlatform() = default;
 VulkanPlatform::~VulkanPlatform() = default;
 
 VulkanPlatform::SwapChainBundle VulkanPlatform::getSwapChainBundle(SwapChainPtr handle) {
+    SYSTRACE_CALL();
     SWAPCHAIN_RET_FUNC(getSwapChainBundle, handle, )
 }
 
 VkResult VulkanPlatform::acquire(SwapChainPtr handle, VkSemaphore clientSignal, uint32_t* index) {
+    SYSTRACE_CALL();
     SWAPCHAIN_RET_FUNC(acquire, handle, clientSignal, index)
 }
 
 VkResult VulkanPlatform::present(SwapChainPtr handle, uint32_t index,
         VkSemaphore finishedDrawing) {
+    SYSTRACE_CALL();
     SWAPCHAIN_RET_FUNC(present, handle, index, finishedDrawing)
 }
 
 bool VulkanPlatform::hasResized(SwapChainPtr handle) {
+    SYSTRACE_CALL();
     SWAPCHAIN_RET_FUNC(hasResized, handle, )
 }
 
 VkResult VulkanPlatform::recreate(SwapChainPtr handle) {
+    SYSTRACE_CALL();
     SWAPCHAIN_RET_FUNC(recreate, handle, )
 }
 
 void VulkanPlatform::destroy(SwapChainPtr handle) {
+    SYSTRACE_CALL();
     if (mImpl->mSurfaceSwapChains.erase(handle)) {
         delete static_cast<VulkanPlatformSurfaceSwapChain*>(handle);
     } else if (mImpl->mHeadlessSwapChains.erase(handle)) {
@@ -725,6 +745,7 @@ void VulkanPlatform::destroy(SwapChainPtr handle) {
 
 SwapChainPtr VulkanPlatform::createSwapChain(void* nativeWindow, uint64_t flags,
         VkExtent2D extent) {
+    SYSTRACE_CALL();
     assert_invariant(nativeWindow || (extent.width != 0 && extent.height != 0));
     bool const headless = extent.width != 0 && extent.height != 0;
     if (headless) {

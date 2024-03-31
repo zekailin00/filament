@@ -32,20 +32,25 @@ CommandBufferQueue::CommandBufferQueue(size_t requiredSize, size_t bufferSize)
         : mRequiredSize((requiredSize + (CircularBuffer::getBlockSize() - 1u)) & ~(CircularBuffer::getBlockSize() -1u)),
           mCircularBuffer(bufferSize),
           mFreeSpace(mCircularBuffer.size()) {
+    SYSTRACE_CALL();
     assert_invariant(mCircularBuffer.size() > requiredSize);
 }
 
 CommandBufferQueue::~CommandBufferQueue() {
+    SYSTRACE_CALL();
     assert_invariant(mCommandBuffersToExecute.empty());
 }
 
 void CommandBufferQueue::requestExit() {
+    SYSTRACE_CALL();
+    SYSTRACE_TEXT("CommandBufferQueue::requestExit");
     std::lock_guard<utils::Mutex> const lock(mLock);
     mExitRequested = EXIT_REQUESTED;
     mCondition.notify_one();
 }
 
 bool CommandBufferQueue::isExitRequested() const {
+    SYSTRACE_CALL();
     std::lock_guard<utils::Mutex> const lock(mLock);
     ASSERT_PRECONDITION( mExitRequested == 0 || mExitRequested == EXIT_REQUESTED,
             "mExitRequested is corrupted (value = 0x%08x)!", mExitRequested);
@@ -55,6 +60,7 @@ bool CommandBufferQueue::isExitRequested() const {
 
 void CommandBufferQueue::flush() noexcept {
     SYSTRACE_CALL();
+    SYSTRACE_TEXT_COLOR("CommandBufferQueue::flush", COL_LIME);
 
     CircularBuffer& circularBuffer = mCircularBuffer;
     if (circularBuffer.empty()) {
@@ -109,6 +115,8 @@ void CommandBufferQueue::flush() noexcept {
 }
 
 std::vector<CommandBufferQueue::Slice> CommandBufferQueue::waitForCommands() const {
+    SYSTRACE_CALL();
+    SYSTRACE_TEXT_COLOR("CommandBufferQueue::waitForCommands WAIT", COL_RED);
     if (!UTILS_HAS_THREADING) {
         return std::move(mCommandBuffersToExecute);
     }
@@ -120,10 +128,13 @@ std::vector<CommandBufferQueue::Slice> CommandBufferQueue::waitForCommands() con
     ASSERT_PRECONDITION( mExitRequested == 0 || mExitRequested == EXIT_REQUESTED,
             "mExitRequested is corrupted (value = 0x%08x)!", mExitRequested);
 
+    SYSTRACE_TEXT_COLOR("CommandBufferQueue::waitForCommands FETCH", COL_LIME);
     return std::move(mCommandBuffersToExecute);
 }
 
 void CommandBufferQueue::releaseBuffer(CommandBufferQueue::Slice const& buffer) {
+    SYSTRACE_CALL();
+    SYSTRACE_TEXT_COLOR("CommandBufferQueue::releaseBuffer", COL_YELLOW);
     std::lock_guard<utils::Mutex> const lock(mLock);
     mFreeSpace += uintptr_t(buffer.end) - uintptr_t(buffer.begin);
     mCondition.notify_one();

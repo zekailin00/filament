@@ -65,6 +65,7 @@ FRenderer::FRenderer(FEngine& engine) :
         mUserEpoch(engine.getEngineEpoch()),
         mPerRenderPassArena(engine.getPerRenderPassAllocator())
 {
+    SYSTRACE_CALL();
     FDebugRegistry& debugRegistry = engine.getDebugRegistry();
     debugRegistry.registerProperty("d.renderer.doFrameCapture",
             &engine.debug.renderer.doFrameCapture);
@@ -118,6 +119,7 @@ FRenderer::FRenderer(FEngine& engine) :
 }
 
 FRenderer::~FRenderer() noexcept {
+    SYSTRACE_CALL();
     // There shouldn't be any resource left when we get here, but if there is, make sure
     // to free what we can (it would probably mean something when wrong).
 #ifndef NDEBUG
@@ -131,6 +133,7 @@ FRenderer::~FRenderer() noexcept {
 }
 
 void FRenderer::terminate(FEngine& engine) {
+    SYSTRACE_CALL();
     // Here we would cleanly free resources we've allocated, or we own, in particular we would
     // shut down threads if we created any.
     DriverApi& driver = engine.getDriverApi();
@@ -150,10 +153,12 @@ void FRenderer::terminate(FEngine& engine) {
 }
 
 void FRenderer::resetUserTime() {
+    SYSTRACE_CALL();
     mUserEpoch = std::chrono::steady_clock::now();
 }
 
 TextureFormat FRenderer::getHdrFormat(const FView& view, bool translucent) const noexcept {
+    SYSTRACE_CALL();
     if (translucent) {
         return mHdrTranslucent;
     }
@@ -169,11 +174,13 @@ TextureFormat FRenderer::getHdrFormat(const FView& view, bool translucent) const
 }
 
 TextureFormat FRenderer::getLdrFormat(bool translucent) const noexcept {
+    SYSTRACE_CALL();
     return (translucent || !mIsRGB8Supported) ? TextureFormat::RGBA8 : TextureFormat::RGB8;
 }
 
 std::pair<Handle<HwRenderTarget>, TargetBufferFlags>
         FRenderer::getRenderTarget(FView const& view) const noexcept {
+    SYSTRACE_CALL();
     Handle<HwRenderTarget> outTarget = view.getRenderTargetHandle();
     TargetBufferFlags outAttachmentMask = view.getRenderTargetAttachmentMask();
     if (!outTarget) {
@@ -189,6 +196,7 @@ backend::TargetBufferFlags FRenderer::getClearFlags() const noexcept {
 }
 
 void FRenderer::initializeClearFlags() noexcept {
+    SYSTRACE_CALL();
     // We always discard and clear the depth+stencil buffers -- we don't allow sharing these
     // across views (clear implies discard)
     mDiscardStartFlags = ((mClearOptions.discard || mClearOptions.clear) ?
@@ -199,6 +207,7 @@ void FRenderer::initializeClearFlags() noexcept {
 }
 
 void FRenderer::setPresentationTime(int64_t monotonic_clock_ns) {
+    SYSTRACE_CALL();
     FEngine::DriverApi& driver = mEngine.getDriverApi();
     driver.setPresentationTime(monotonic_clock_ns);
 }
@@ -253,6 +262,7 @@ bool FRenderer::beginFrame(FSwapChain* swapChain, uint64_t vsyncSteadyClockTimeN
     * The remaining work will be done when the first render() call is made.
     */
     auto beginFrameInternal = [this, appVsync]() {
+        SYSTRACE_NAME("beginFrameInternal");
         FEngine& engine = mEngine;
         FEngine::DriverApi& driver = engine.getDriverApi();
 
@@ -339,6 +349,7 @@ void FRenderer::endFrame() {
 
 void FRenderer::readPixels(uint32_t xoffset, uint32_t yoffset, uint32_t width, uint32_t height,
         PixelBufferDescriptor&& buffer) {
+    SYSTRACE_CALL();
 #ifndef NDEBUG
     const bool withinFrame = mSwapChain != nullptr;
     ASSERT_PRECONDITION(withinFrame, "readPixels() on a SwapChain must be called after"
@@ -351,6 +362,7 @@ void FRenderer::readPixels(uint32_t xoffset, uint32_t yoffset, uint32_t width, u
 void FRenderer::readPixels(FRenderTarget* renderTarget,
         uint32_t xoffset, uint32_t yoffset, uint32_t width, uint32_t height,
         backend::PixelBufferDescriptor&& buffer) {
+    SYSTRACE_CALL();
     RendererUtils::readPixels(mEngine.getDriverApi(), renderTarget->getHwHandle(),
             xoffset, yoffset, width, height, std::move(buffer));
 }
@@ -452,6 +464,7 @@ void FRenderer::render(FView const* view) {
 }
 
 void FRenderer::renderInternal(FView const* view) {
+    SYSTRACE_CALL();
     // per-renderpass data
     ArenaScope rootArena(mPerRenderPassArena);
 
@@ -472,6 +485,7 @@ void FRenderer::renderInternal(FView const* view) {
 }
 
 void FRenderer::renderJob(ArenaScope& arena, FView& view) {
+    SYSTRACE_CALL();
     FEngine& engine = mEngine;
     JobSystem& js = engine.getJobSystem();
     FEngine::DriverApi& driver = engine.getDriverApi();

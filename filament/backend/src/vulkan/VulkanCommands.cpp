@@ -39,6 +39,7 @@ using Timestamp = VulkanGroupMarkers::Timestamp;
 
 VulkanCmdFence::VulkanCmdFence(VkFence ifence)
     : fence(ifence) {
+    SYSTRACE_CALL();
     // Internally we use the VK_INCOMPLETE status to mean "not yet submitted". When this fence gets
     // submitted, its status changes to VK_NOT_READY. Finally, when the GPU actually finishes
     // executing the command buffer, the status changes to VK_SUCCESS.
@@ -48,6 +49,7 @@ VulkanCmdFence::VulkanCmdFence(VkFence ifence)
 VulkanCommandBuffer::VulkanCommandBuffer(VulkanResourceAllocator* allocator, VkDevice device,
         VkCommandPool pool)
     : mResourceManager(allocator) {
+    SYSTRACE_CALL();
     // Create the low-level command buffer.
     const VkCommandBufferAllocateInfo allocateInfo{
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -64,6 +66,7 @@ VulkanCommandBuffer::VulkanCommandBuffer(VulkanResourceAllocator* allocator, VkD
 CommandBufferObserver::~CommandBufferObserver() {}
 
 static VkCommandPool createPool(VkDevice device, uint32_t queueFamilyIndex) {
+    SYSTRACE_CALL();
     VkCommandPoolCreateInfo createInfo = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
             .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
@@ -136,6 +139,7 @@ VulkanCommands::VulkanCommands(VkDevice device, VkQueue queue, uint32_t queueFam
       mPool(createPool(mDevice, queueFamilyIndex)),
       mContext(context),
       mStorage(CAPACITY) {
+    SYSTRACE_CALL();
     VkSemaphoreCreateInfo sci{.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
     for (auto& semaphore: mSubmissionSignals) {
         vkCreateSemaphore(mDevice, &sci, nullptr, &semaphore);
@@ -156,6 +160,7 @@ VulkanCommands::VulkanCommands(VkDevice device, VkQueue queue, uint32_t queueFam
 }
 
 VulkanCommands::~VulkanCommands() {
+    SYSTRACE_CALL();
     wait();
     gc();
     vkDestroyCommandPool(mDevice, mPool, VKALLOC);
@@ -168,6 +173,7 @@ VulkanCommands::~VulkanCommands() {
 }
 
 VulkanCommandBuffer& VulkanCommands::get() {
+    SYSTRACE_CALL();
     if (mCurrentCommandBufferIndex >= 0) {
         return *mStorage[mCurrentCommandBufferIndex].get();
     }
@@ -228,6 +234,7 @@ VulkanCommandBuffer& VulkanCommands::get() {
 }
 
 bool VulkanCommands::flush() {
+    SYSTRACE_CALL();
     // It's perfectly fine to call flush when no commands have been written.
     if (mCurrentCommandBufferIndex < 0) {
         return false;
@@ -316,6 +323,7 @@ bool VulkanCommands::flush() {
 }
 
 VkSemaphore VulkanCommands::acquireFinishedSignal() {
+    SYSTRACE_CALL();
     VkSemaphore semaphore = mSubmissionSignal;
     mSubmissionSignal = VK_NULL_HANDLE;
 #if FVK_ENABLED(FVK_DEBUG_COMMAND_BUFFER)
@@ -325,6 +333,7 @@ VkSemaphore VulkanCommands::acquireFinishedSignal() {
 }
 
 void VulkanCommands::injectDependency(VkSemaphore next) {
+    SYSTRACE_CALL();
     assert_invariant(mInjectedSignal == VK_NULL_HANDLE);
     mInjectedSignal = next;
 #if FVK_ENABLED(FVK_DEBUG_COMMAND_BUFFER)
@@ -333,6 +342,7 @@ void VulkanCommands::injectDependency(VkSemaphore next) {
 }
 
 void VulkanCommands::wait() {
+    SYSTRACE_CALL();
     VkFence fences[CAPACITY];
     size_t count = 0;
     for (size_t i = 0; i < CAPACITY; i++) {
@@ -377,6 +387,7 @@ void VulkanCommands::gc() {
 }
 
 void VulkanCommands::updateFences() {
+    SYSTRACE_CALL();
     for (size_t i = 0; i < CAPACITY; i++) {
         auto wrapper = mStorage[i].get();
         if (wrapper->buffer() != VK_NULL_HANDLE) {

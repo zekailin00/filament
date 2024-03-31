@@ -18,6 +18,7 @@
 
 #include <utils/Log.h>
 #include <utils/debug.h>
+#include <utils/Systrace.h>
 
 namespace filament {
 
@@ -26,12 +27,14 @@ using namespace backend;
 
 FrameSkipper::FrameSkipper(size_t latency) noexcept
         : mLast(latency - 1) {
+    SYSTRACE_CALL();
     assert_invariant(latency <= MAX_FRAME_LATENCY);
 }
 
 FrameSkipper::~FrameSkipper() noexcept = default;
 
 void FrameSkipper::terminate(DriverApi& driver) noexcept {
+    SYSTRACE_CALL();
     for (auto fence : mDelayedFences) {
         if (fence) {
             driver.destroyFence(fence);
@@ -40,6 +43,7 @@ void FrameSkipper::terminate(DriverApi& driver) noexcept {
 }
 
 bool FrameSkipper::beginFrame(DriverApi& driver) noexcept {
+    SYSTRACE_CALL();
     auto& fences = mDelayedFences;
     auto fence = fences.front();
     if (fence) {
@@ -58,6 +62,7 @@ bool FrameSkipper::beginFrame(DriverApi& driver) noexcept {
 }
 
 void FrameSkipper::endFrame(DriverApi& driver) noexcept {
+    SYSTRACE_CALL();
     // If the user produced a new frame despite the fact that the previous one wasn't finished
     // (i.e. FrameSkipper::beginFrame() returned false), we need to make sure to replace
     // a fence that might be here already)

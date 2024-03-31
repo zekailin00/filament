@@ -111,6 +111,7 @@ void CommandStream::execute(void* buffer) {
 }
 
 void CommandStream::queueCommand(std::function<void()> command) {
+    SYSTRACE_CALL();
     new(allocateCommand(CustomCommand::align(sizeof(CustomCommand)))) CustomCommand(std::move(command));
 }
 
@@ -150,6 +151,7 @@ void CommandType<void (Driver::*)(ARGS...)>::Command<METHOD>::log() noexcept  {
 // ------------------------------------------------------------------------------------------------
 
 void CustomCommand::execute(Driver&, CommandBase* base, intptr_t* next) noexcept {
+    SYSTRACE_CALL();
     *next = CustomCommand::align(sizeof(CustomCommand));
     static_cast<CustomCommand*>(base)->mCommand();
     static_cast<CustomCommand*>(base)->~CustomCommand();

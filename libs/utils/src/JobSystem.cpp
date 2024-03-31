@@ -21,7 +21,7 @@
 #endif
 
 // when SYSTRACE_TAG_JOBSYSTEM is used, enables even heavier systraces
-#define HEAVY_SYSTRACE  0
+#define HEAVY_SYSTRACE  1
 
 // enable for catching hangs waiting on a job to finish
 static constexpr bool DEBUG_FINISH_HANGS = false;
@@ -143,6 +143,7 @@ JobSystem::JobSystem(const size_t userThreadCount, const size_t adoptableThreads
       mJobStorageBase(static_cast<Job *>(mJobPool.getAllocator().getCurrent()))
 {
     SYSTRACE_ENABLE();
+    HEAVY_SYSTRACE_CALL();
 
     int threadPoolCount = userThreadCount;
     if (threadPoolCount == 0) {
@@ -187,6 +188,7 @@ JobSystem::JobSystem(const size_t userThreadCount, const size_t adoptableThreads
 }
 
 JobSystem::~JobSystem() {
+    HEAVY_SYSTRACE_CALL();
     requestExit();
 
     #pragma nounroll
@@ -224,21 +226,25 @@ void JobSystem::decRef(Job const* job) noexcept {
 }
 
 void JobSystem::requestExit() noexcept {
+    HEAVY_SYSTRACE_CALL();
     mExitRequested.store(true);
     std::lock_guard<Mutex> lock(mWaiterLock);
     mWaiterCondition.notify_all();
 }
 
 inline bool JobSystem::exitRequested() const noexcept {
+    HEAVY_SYSTRACE_CALL();
     // memory_order_relaxed is safe because the only action taken is to exit the thread
     return mExitRequested.load(std::memory_order_relaxed);
 }
 
 inline bool JobSystem::hasActiveJobs() const noexcept {
+    HEAVY_SYSTRACE_CALL();
     return mActiveJobs.load(std::memory_order_relaxed) > 0;
 }
 
 inline bool JobSystem::hasJobCompleted(JobSystem::Job const* job) noexcept {
+    HEAVY_SYSTRACE_CALL();
     return job->runningJobCount.load(std::memory_order_acquire) <= 0;
 }
 
@@ -307,6 +313,7 @@ JobSystem::Job* JobSystem::allocateJob() noexcept {
 }
 
 void JobSystem::put(WorkQueue& workQueue, Job* job) noexcept {
+    HEAVY_SYSTRACE_CALL();
     assert(job);
     size_t index = job - mJobStorageBase;
     assert(index >= 0 && index < MAX_JOB_COUNT);
@@ -323,6 +330,7 @@ void JobSystem::put(WorkQueue& workQueue, Job* job) noexcept {
 }
 
 JobSystem::Job* JobSystem::pop(WorkQueue& workQueue) noexcept {
+    HEAVY_SYSTRACE_CALL();
     // decrement mActiveJobs first, this is to ensure that if there is only a single job left
     // (and we're about to pick it up), other threads don't loop trying to do the same.
     mActiveJobs.fetch_sub(1, std::memory_order_relaxed);
@@ -345,6 +353,7 @@ JobSystem::Job* JobSystem::pop(WorkQueue& workQueue) noexcept {
 }
 
 JobSystem::Job* JobSystem::steal(WorkQueue& workQueue) noexcept {
+    HEAVY_SYSTRACE_CALL();
     // decrement mActiveJobs first, this is to ensure that if there is only a single job left
     // (and we're about to pick it up), other threads don't loop trying to do the same.
     mActiveJobs.fetch_sub(1, std::memory_order_relaxed);
@@ -366,6 +375,7 @@ JobSystem::Job* JobSystem::steal(WorkQueue& workQueue) noexcept {
 }
 
 inline JobSystem::ThreadState* JobSystem::getStateToStealFrom(JobSystem::ThreadState& state) noexcept {
+    HEAVY_SYSTRACE_CALL();
     auto& threadStates = mThreadStates;
     // memory_order_relaxed is okay because we don't take any action that has data dependency
     // on this value (in particular mThreadStates, is always initialized properly).
@@ -415,6 +425,7 @@ bool JobSystem::execute(JobSystem::ThreadState& state) noexcept {
 
         if (UTILS_LIKELY(job->function)) {
             HEAVY_SYSTRACE_NAME("job->function");
+            SYSTRACE_TEXT_COLOR("job->function", COL_BLUE);
             job->function(job->storage, *this, job);
         }
         finish(job);
@@ -484,6 +495,7 @@ void JobSystem::finish(Job* job) noexcept {
 
 
 JobSystem::Job* JobSystem::create(JobSystem::Job* parent, JobFunc func) noexcept {
+    HEAVY_SYSTRACE_CALL();
     parent = (parent == nullptr) ? mRootJob : parent;
     Job* const job = allocateJob();
     if (UTILS_LIKELY(job)) {
@@ -507,22 +519,26 @@ JobSystem::Job* JobSystem::create(JobSystem::Job* parent, JobFunc func) noexcept
 }
 
 void JobSystem::cancel(Job*& job) noexcept {
+    HEAVY_SYSTRACE_CALL();
     finish(job);
     job = nullptr;
 }
 
 JobSystem::Job* JobSystem::retain(JobSystem::Job* job) noexcept {
+    HEAVY_SYSTRACE_CALL();
     JobSystem::Job* retained = job;
     incRef(retained);
     return retained;
 }
 
 void JobSystem::release(JobSystem::Job*& job) noexcept {
+    HEAVY_SYSTRACE_CALL();
     decRef(job);
     job = nullptr;
 }
 
 void JobSystem::signal() noexcept {
+    HEAVY_SYSTRACE_CALL();
     wakeAll();
 }
 
@@ -538,6 +554,7 @@ void JobSystem::run(Job*& job) noexcept {
 }
 
 JobSystem::Job* JobSystem::runAndRetain(Job* job) noexcept {
+    HEAVY_SYSTRACE_CALL();
     JobSystem::Job* retained = retain(job);
     run(job);
     return retained;
@@ -581,11 +598,13 @@ void JobSystem::waitAndRelease(Job*& job) noexcept {
 }
 
 void JobSystem::runAndWait(JobSystem::Job*& job) noexcept {
+    HEAVY_SYSTRACE_CALL();
     runAndRetain(job);
     waitAndRelease(job);
 }
 
 void JobSystem::adopt() {
+    HEAVY_SYSTRACE_CALL();
     const auto tid = std::this_thread::get_id();
 
     std::unique_lock<utils::Mutex> lock(mThreadMapLock);
@@ -620,6 +639,7 @@ void JobSystem::adopt() {
 }
 
 void JobSystem::emancipate() {
+    HEAVY_SYSTRACE_CALL();
     const auto tid = std::this_thread::get_id();
     std::lock_guard<utils::Mutex> lock(mThreadMapLock);
     auto iter = mThreadMap.find(tid);
