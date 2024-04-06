@@ -47,6 +47,8 @@ option(FILAMENT_ENABLE_FEATURE_LEVEL_0 "Enable Feature Level 0" ON)
 
 option(TRACY_ENABLE "Enable Tracy profiler for Systrace" ON)
 
+option(FILAMENT_SUPPORTS_OPENXR "Enable OpenXR support (Vulkan only)" OFF)
+
 set(FILAMENT_NDK_VERSION "" CACHE STRING
     "Android NDK version or version prefix to be used when building for Android."
 )
@@ -776,6 +778,9 @@ if (FILAMENT_SUPPORTS_VULKAN)
     add_subdirectory(${EXTERNAL}/vkmemalloc/tnt)
     set(SPIRV_HEADERS_SKIP_EXAMPLES ON)
     add_subdirectory(${EXTERNAL}/spirv-headers)
+    if (FILAMENT_SUPPORTS_OPENXR)
+        add_subdirectory(${EXTERNAL}/OpenXR-SDK)
+    endif()
 endif()
 
 set(FILAMENT_SAMPLES_BINARY_DIR ${PROJECT_BINARY_DIR}/samples)
