@@ -214,6 +214,12 @@ if (FILAMENT_SUPPORTS_VULKAN)
     elseif (APPLE OR IOS)
         list(APPEND SRCS src/vulkan/platform/VulkanPlatformApple.mm)
     endif()
+    if (FILAMENT_SUPPORTS_OPENXR)
+        list(APPEND SRCS
+            include/backend/platforms/VulkanOpenxrPlatform.h
+            src/vulkan/platform/VulkanOpenxrPlatform.cpp
+        )
+    endif()
 endif()
 
 # ==================================================================================================

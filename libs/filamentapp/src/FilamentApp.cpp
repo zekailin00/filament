@@ -607,7 +607,12 @@ FilamentApp::Window::Window(FilamentApp* filamentApp,
         if (backend == Engine::Backend::VULKAN) {
             #if defined(FILAMENT_DRIVER_SUPPORTS_VULKAN)
                 mFilamentApp->mVulkanPlatform =
-                        new FilamentAppVulkanPlatform(config.vulkanGPUHint.c_str());
+                #if defined(FILAMENT_SUPPORTS_OPENXR)
+                    new VulkanOpenxrPlatform()::Initialize();
+                    //TODO: Check it is not NULL
+                #else
+                    new FilamentAppVulkanPlatform(config.vulkanGPUHint.c_str());
+                #endif
                 return Engine::Builder()
                         .backend(backend)
                         .platform(mFilamentApp->mVulkanPlatform)
