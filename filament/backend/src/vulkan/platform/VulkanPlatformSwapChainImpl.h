@@ -23,6 +23,10 @@
 
 #include <bluevk/BlueVK.h>
 
+#if defined(FILAMENT_SUPPORTS_OPENXR)
+#include <backend/platforms/VulkanOpenxrPlatform.h>
+#endif
+
 #include <tuple>
 #include <unordered_map>
 
@@ -111,6 +115,67 @@ private:
     bool mHasStencil = false;
     bool mSuboptimal;
 };
+
+
+#if defined(FILAMENT_SUPPORTS_OPENXR)
+
+struct VulkanPlatformOpenxrSwapChain: public VulkanPlatformSwapChainImpl
+{
+    VulkanPlatformOpenxrSwapChain(VulkanContext const& context, VkDevice device, VkQueue queue,
+        OpenxrSession* session, VkExtent2D extent, uint32_t sampleCount, uint64_t flags);
+
+    ~VulkanPlatformOpenxrSwapChain();
+
+    // Non-virtual override
+    VkResult acquire(VkSemaphore clientSignal, uint32_t* index);
+
+    // Non-virtual override
+    VkResult present(uint32_t index, VkSemaphore finished);
+
+    // Non-virtual override-able method
+    VkResult recreate();
+
+    // Non-virtual override-able method
+    bool hasResized();
+
+private:
+    VkResult create();
+    bool SelectImageFormat(VkFormat format);
+
+
+    // VkInstance mInstance;
+    // VkPhysicalDevice mPhysicalDevice;
+    // // This class takes ownership of the surface.
+    // VkSurfaceKHR mSurface;
+    // VkSwapchainKHR mSwapchain = VK_NULL_HANDLE;
+    // VkExtent2D const mFallbackExtent;
+
+    bool mUsesRGB = false;
+    bool mHasStencil = false;
+    bool mSuboptimal;
+
+    OpenxrSession* mSession = nullptr;
+    XrSwapchain mSwapchain;
+    std::vector<VkImage> images{};
+    std::vector<VkImageView> imageViews{};
+    std::vector<VkFramebuffer> framebuffers{};
+
+    int64_t imageFormat = 0;
+    uint32_t imageCount = 0;
+    VkExtent2D mExtent;
+    int mEye = -1;
+
+    // // Render loop context
+    // // reset when enter XR_SESSION_STATE_READY
+    // // index 0 = left eye, index 1 = right eye
+    // XrFrameState frameState{};
+    // XrCompositionLayerProjection layer;
+    // XrCompositionLayerProjectionView layerViews[2]; 
+    // XrView views[2];
+    // int eye;
+};
+
+#endif
 
 struct VulkanPlatformHeadlessSwapChain : public VulkanPlatformSwapChainImpl {
     static constexpr size_t const HEADLESS_SWAPCHAIN_SIZE = 2;

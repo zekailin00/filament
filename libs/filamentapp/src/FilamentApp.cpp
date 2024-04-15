@@ -644,9 +644,9 @@ FilamentApp::Window::Window(FilamentApp* filamentApp,
         // current, rather than the one created by SDL.
         mFilamentApp->mEngine = createEngine();
 #if defined(FILAMENT_SUPPORTS_OPENXR)
-        mFilamentApp->openxrSession = dynamic_cast<VulkanOpenxrPlatform*>(
+        mFilamentApp->mOpenxrSession = dynamic_cast<VulkanOpenxrPlatform*>(
             mFilamentApp->mVulkanPlatform)->CreateSession();
-            assert(mFilamentApp->openxrSession);
+        assert(mFilamentApp->mOpenxrSession);
 #endif
         // get the resolved backend
         mBackend = config.backend = mFilamentApp->mEngine->getBackend();

@@ -10,6 +10,8 @@ namespace filament::backend {
 
 
 class OpenxrSession;
+class VulkanPlatformOpenxrSwapChain;
+
 class VulkanOpenxrPlatform : public VulkanPlatform
 {
 public:
@@ -33,6 +35,9 @@ public:
     }
 
     friend OpenxrSession;
+
+    virtual SwapChainPtr createSwapChain(void* nativeWindow, uint64_t flags = 0,
+            VkExtent2D extent = {0, 0}) override;
 
 protected:
     ExtensionSet getInstanceExtensions() override;
@@ -120,8 +125,12 @@ private:
     void Initialize(VulkanOpenxrPlatform* platform);
     void Destroy();
 
+    //FIXME: Get view index from swapchain???
+    int GetSwapchainIndex() {return eyeCreated++;}
+
 private:    
     friend VulkanOpenxrPlatform;
+    friend VulkanPlatformOpenxrSwapChain;
     VulkanOpenxrPlatform* platform = nullptr;
 
     XrSession xrSession = XR_NULL_HANDLE;
@@ -142,10 +151,9 @@ private:
     // reset when enter XR_SESSION_STATE_READY
     // index 0 = left eye, index 1 = right eye
     XrFrameState frameState{};
-    XrCompositionLayerProjection layer;
     XrCompositionLayerProjectionView layerViews[2]; 
     XrView views[2];
-    int eye;
+    int eyeCreated = 0;
 };
 
 }// namespace filament::backend

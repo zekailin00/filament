@@ -263,7 +263,7 @@ private:
 #if defined(FILAMENT_DRIVER_SUPPORTS_VULKAN)
     filament::backend::VulkanPlatform* mVulkanPlatform = nullptr;
 #if defined(FILAMENT_SUPPORTS_OPENXR)
-    filament::backend::OpenxrSession* openxrSession = nullptr;
+    filament::backend::OpenxrSession* mOpenxrSession = nullptr;
 #endif
 #endif
 };

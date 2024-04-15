@@ -83,6 +83,11 @@ static constexpr uint64_t SWAP_CHAIN_CONFIG_SRGB_COLORSPACE     = 0x10;
  */
 static constexpr uint64_t SWAP_CHAIN_HAS_STENCIL_BUFFER         = 0x20;
 
+/**
+ * Indicates that the native window is an OpenXR session
+ */
+static constexpr uint64_t SWAP_CHAIN_CONFIG_OPENXR_SESSION      = 0x40;
+
 
 static constexpr size_t MAX_VERTEX_ATTRIBUTE_COUNT  = 16;   // This is guaranteed by OpenGL ES.
 static constexpr size_t MAX_SAMPLER_COUNT           = 62;   // Maximum needed at feature level 3.

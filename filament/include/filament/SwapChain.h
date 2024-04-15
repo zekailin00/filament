@@ -228,6 +228,15 @@ public:
     static constexpr uint64_t CONFIG_HAS_STENCIL_BUFFER = backend::SWAP_CHAIN_HAS_STENCIL_BUFFER;
 
     /**
+     * Indicates that the native window is an OpenXR session
+     * 
+     * This is only supported when OpenXR supported is enabled and
+     * Vulkan OpenXR platform is created.
+     *
+     */
+    static const uint64_t CONFIG_OPENXR_SESSION = backend::SWAP_CHAIN_CONFIG_OPENXR_SESSION;
+
+    /**
      * Return whether createSwapChain supports the SWAP_CHAIN_CONFIG_SRGB_COLORSPACE flag.
      * The default implementation returns false.
      *

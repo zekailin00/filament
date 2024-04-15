@@ -1,5 +1,6 @@
 #include "backend/platforms/VulkanOpenxrPlatform.h"
 #include "backend/platforms/VulkanPlatform.h"
+#include "vulkan/platform/VulkanPlatformSwapChainImpl.h"
 #include "vulkan/VulkanContext.h"
 
 #include <utils/Systrace.h>
@@ -67,6 +68,7 @@ static void strcpy_s(char* dest, const char* src)
  
 } // namespace utility
        
+#include "VulkanPlatformPrivate.inc"
 
 VulkanOpenxrPlatform* VulkanOpenxrPlatform::Initialize()
 {
@@ -449,7 +451,36 @@ bool VulkanOpenxrPlatform::TryReadNextEvent(XrEventDataBuffer* eventDataBuffer)
     return false;
 }
 
-#include "VulkanPlatformPrivate.inc"
+SwapChainPtr VulkanOpenxrPlatform::createSwapChain(void* nativeWindow,
+    uint64_t flags, VkExtent2D extent)
+{
+    if (flags == backend::SWAP_CHAIN_CONFIG_OPENXR_SESSION)
+    {
+        // VulkanPlatformOpenxrSwapChain* swapchain = new VulkanPlatformOpenxrSwapChain(
+        //         mImpl->mContext, mImpl->mDevice, mImpl->mGraphicsQueue, extent, flags);
+        // mImpl->mHeadlessSwapChains.insert(swapchain);
+        // return swapchain;
+    }
+    else
+    {
+        return VulkanPlatform::createSwapChain(nativeWindow, flags, extent);
+    }
+}
+
+void OpenxrSession::PollActions()
+{
+    
+}
+
+void OpenxrSession::BeginFrame()
+{
+
+}
+
+void OpenxrSession::EndFrame()
+{
+
+}
 
 void OpenxrSession::Initialize(VulkanOpenxrPlatform* platform)
 {
@@ -458,6 +489,13 @@ void OpenxrSession::Initialize(VulkanOpenxrPlatform* platform)
     this->platform = platform;
     InitializeSession();
     InitializeSpaces();
+    // Initialize actions?
+
+    XrSessionActionSetsAttachInfo attachInfo
+        {XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO};
+    attachInfo.countActionSets = 1;
+    attachInfo.actionSets = &platform->inputActionSet;
+    CHK_XRCMD2(xrAttachSessionActionSets(xrSession, &attachInfo));
 }
 
 void OpenxrSession::Destroy()
@@ -627,14 +665,14 @@ void OpenxrSession::SetSessionState(XrSessionState newState)
             info.primaryViewConfigurationType = 
                 XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
             CHK_XRCMD2(xrBeginSession(xrSession, &info));
-            eye = 0;
+            eyeCreated = 0;
             frameState = {XR_TYPE_FRAME_STATE};
             break;
         }
         case XR_SESSION_STATE_STOPPING:
         {
             CHK_XRCMD2(xrEndSession(xrSession));
-            eye = 0;
+            eyeCreated = 0;
             frameState = {XR_TYPE_FRAME_STATE};
             break;
         }
