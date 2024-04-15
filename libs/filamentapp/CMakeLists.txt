@@ -145,6 +145,11 @@ else()
     target_compile_options(${TARGET} PRIVATE -Wno-deprecated-register)
 endif()
 
+if (FILAMENT_SUPPORTS_VULKAN AND FILAMENT_SUPPORTS_OPENXR)
+    target_compile_definitions(${TARGET} PRIVATE FILAMENT_SUPPORTS_OPENXR)
+endif ()
+
+
 # Multi-configuration generators, like Visual Studio or Xcode, place executable binaries in a
 # sub-directory named after the configuration, like "Debug" or "Release".
 # For these generators, in order to find assets, we must "walk" up an additional directory.

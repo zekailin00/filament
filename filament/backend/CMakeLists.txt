@@ -169,6 +169,7 @@ if (FILAMENT_SUPPORTS_VULKAN)
             src/vulkan/platform/VulkanPlatform.cpp
             src/vulkan/platform/VulkanPlatformSwapChainImpl.cpp
             src/vulkan/platform/VulkanPlatformSwapChainImpl.h
+            src/vulkan/platform/VulkanPlatformPrivate.inc
             src/vulkan/spirv/VulkanSpirvUtils.cpp
             src/vulkan/spirv/VulkanSpirvUtils.h
             src/vulkan/VulkanBlitter.cpp

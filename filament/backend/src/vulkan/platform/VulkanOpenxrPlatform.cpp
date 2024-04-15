@@ -1,13 +1,27 @@
 #include "backend/platforms/VulkanOpenxrPlatform.h"
+#include "backend/platforms/VulkanPlatform.h"
+#include "vulkan/VulkanContext.h"
 
 #include <utils/Systrace.h>
 
-#define CHK_XRCMD(result) do { if (XR_FAILED(result)) {     \
-    char resultBuffer[XR_MAX_STRUCTURE_NAME_SIZE];          \
-    XrResult res;                                           \
-    xrResultToString(xrInstance, res, resultBuffer);        \
-    utils::slog.i << "[OpenXR] API call error: "            \
-        << std::string(resultBuffer);                       \
+#define CHK_XRCMD(result) do {                                          \
+    XrResult res = result;                                              \
+    if (XR_FAILED(res)) {                                               \
+    char resultBuffer[XR_MAX_STRUCTURE_NAME_SIZE];                      \
+    xrResultToString(xrInstance, res, resultBuffer);                    \
+    utils::slog.i << "[OpenXR] API call error: "                        \
+        << std::string(resultBuffer)                                    \
+        << utils::io::endl;                                             \
+} } while(0)
+
+#define CHK_XRCMD2(result) do {                                         \
+    XrResult res = result;                                              \
+    if (XR_FAILED(res)) {                                               \
+    char resultBuffer[XR_MAX_STRUCTURE_NAME_SIZE];                      \
+    xrResultToString(platform->xrInstance, res, resultBuffer);          \
+    utils::slog.i << "[OpenXR] API call error: "                        \
+        << std::string(resultBuffer)                                    \
+        << utils::io::endl;                                             \
 } } while(0)
 
 #define CREATE_ACTION(actName, actType) do {                            \
@@ -96,7 +110,7 @@ VulkanOpenxrPlatform* VulkanOpenxrPlatform::Initialize()
     std::vector<const char*> enabledExt = {
         "XR_KHR_vulkan_enable", "XR_EXT_debug_utils"
     };
-    instanceInfo.enabledExtensionCount = enabledExt.size();
+    instanceInfo.enabledExtensionCount = (uint32_t) enabledExt.size();
     instanceInfo.enabledExtensionNames = enabledExt.data();
 
     XrInstance xrInstance;
@@ -149,6 +163,66 @@ VulkanOpenxrPlatform* VulkanOpenxrPlatform::Initialize()
     platform->InitializeActions();
 
     return platform;
+}
+
+void VulkanOpenxrPlatform::Destroy()
+{
+    SYSTRACE_NAME("OpenxrPlatform::Destroy");
+    xrDestroyActionSet(inputActionSet);
+    xrDestroyInstance(xrInstance);
+}
+
+OpenxrSession* VulkanOpenxrPlatform::CreateSession()
+{
+    SYSTRACE_NAME("OpenxrPlatform::CreateSession");
+    assert(activeSession == nullptr);
+
+    activeSession = new OpenxrSession();
+    activeSession->Initialize(this);
+
+    return activeSession;
+}
+
+void VulkanOpenxrPlatform::DestroySession(OpenxrSession*& openxrSession)
+{
+    SYSTRACE_NAME("OpenxrPlatform::DestroySession");
+    assert(activeSession != nullptr);
+    
+    openxrSession->Destroy();
+    delete openxrSession;
+    openxrSession = nullptr;
+}
+
+ExtensionSet VulkanOpenxrPlatform::ParseExtensionString(char* names)
+{
+    ExtensionSet list;
+    while (*names != 0)
+    {
+        list.emplace(names);
+        while (*(++names) != 0)
+        {
+            if (*names == ' ')
+            {
+                *names++ = '\0';
+                break;
+            }
+        }
+    }
+    return list;
+}
+
+ExtensionSet VulkanOpenxrPlatform::getInstanceExtensions()
+{
+    ExtensionSet extensions = VulkanPlatform::getInstanceExtensions();
+    extensions.insert(vulkanInstanceExt.begin(), vulkanInstanceExt.end());
+    return extensions;
+}
+
+ExtensionSet VulkanOpenxrPlatform::getDeviceExtensions(VkPhysicalDevice device)
+{
+    ExtensionSet extensions = VulkanPlatform::getDeviceExtensions(device);
+    extensions.insert(vulkanDeviceExt.begin(), vulkanDeviceExt.end());
+    return extensions;
 }
 
 void VulkanOpenxrPlatform::LoadViewConfig()
@@ -216,7 +290,7 @@ void VulkanOpenxrPlatform::LoadVulkanRequirements()
         xrInstance, xrSystemId, count, &count, vulkanInstanceExtStr.data());
     vulkanInstanceExt = ParseExtensionString(vulkanInstanceExtStr.data());
 
-    for(const char* extension: vulkanInstanceExt)
+    for(std::string_view extension: vulkanInstanceExt)
         utils::slog.i << "[OpenXR] vkInstance extension: "
             << std::string(extension) << utils::io::endl;
 
@@ -231,7 +305,7 @@ void VulkanOpenxrPlatform::LoadVulkanRequirements()
         xrInstance, xrSystemId, count, &count, vulkanDeviceExtStr.data());
     vulkanDeviceExt = ParseExtensionString(vulkanDeviceExtStr.data());
 
-    for(const char* extension: vulkanDeviceExt)
+    for(std::string_view extension: vulkanDeviceExt)
         utils::slog.i << "[OpenXR] vkDevice extension: "
             << std::string(extension) << utils::io::endl;
 }
@@ -291,9 +365,291 @@ void VulkanOpenxrPlatform::InitializeActions()
         XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
     suggestedBindings.interactionProfile = oculusTouchInteractionProfilePath;
     suggestedBindings.suggestedBindings = bindings.data();
-    suggestedBindings.countSuggestedBindings = bindings.size();
+    suggestedBindings.countSuggestedBindings = (uint32_t) bindings.size();
     CHK_XRCMD(xrSuggestInteractionProfileBindings(
         xrInstance, &suggestedBindings));
+}
+
+
+void VulkanOpenxrPlatform::PollEvents()
+{
+    ZoneScopedN("OpenxrPlatform::PollEvents");
+
+    XrEventDataBuffer event{};
+    while (TryReadNextEvent(&event))
+    {
+        switch (event.type)
+        {
+            case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING:
+            {
+                const XrEventDataInstanceLossPending& instanceLossPending = 
+                    *reinterpret_cast<const XrEventDataInstanceLossPending*>(&event);
+
+                utils::slog.i << "[OpenXR] XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING"
+                    << utils::io::endl;
+                break;
+            }
+            case XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED:
+            {
+                const XrEventDataSessionStateChanged& sessionStateChangedEvent =
+                    *reinterpret_cast<const XrEventDataSessionStateChanged*>(&event);
+
+                if (activeSession)
+                    activeSession->SetSessionState(sessionStateChangedEvent.state);
+                break;
+            }
+            case XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED:
+            {
+                utils::slog.i << "[OpenXR] XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED"
+                    << utils::io::endl;
+                break;
+            }
+            case XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING:
+            {
+                utils::slog.i << "[OpenXR] XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING"
+                    << utils::io::endl;
+                break;
+            }
+            case XR_TYPE_EVENT_DATA_EVENTS_LOST:
+            {
+                const XrEventDataEventsLost& eventsLost =
+                    *reinterpret_cast<const XrEventDataEventsLost*>(&event);
+
+                utils::slog.i << "[OpenXR] Events lost: "
+                    << std::to_string(eventsLost.lostEventCount)
+                    << utils::io::endl;
+                break;
+            }
+            default:
+            {
+                utils::slog.i << "[OpenXR] Unknown event type "
+                    << std::to_string(event.type)
+                    << utils::io::endl;
+                break;
+            }
+        }
+    }
+    return;
+}
+
+bool VulkanOpenxrPlatform::TryReadNextEvent(XrEventDataBuffer* eventDataBuffer)
+{
+    ZoneScopedN("OpenxrPlatform::TryReadNextEvent");
+
+    XrEventDataBaseHeader* baseHeader =
+        reinterpret_cast<XrEventDataBaseHeader*>(eventDataBuffer);
+
+    *baseHeader = {XR_TYPE_EVENT_DATA_BUFFER};
+    const XrResult result = xrPollEvent(xrInstance, eventDataBuffer);
+    CHK_XRCMD(result);
+
+    if (result == XR_SUCCESS)
+        return true;
+
+    return false;
+}
+
+#include "VulkanPlatformPrivate.inc"
+
+void OpenxrSession::Initialize(VulkanOpenxrPlatform* platform)
+{
+    SYSTRACE_NAME("OpenxrSession::Initialize");
+
+    this->platform = platform;
+    InitializeSession();
+    InitializeSpaces();
+}
+
+void OpenxrSession::Destroy()
+{
+    SYSTRACE_NAME("OpenxrSession::Destroy");
+
+    assert(OpenxrSession::ShouldCloseSession());
+
+    xrDestroySpace(viewSpace);
+    xrDestroySpace(localSpace);
+    xrDestroySpace(stageSpace);
+
+    xrDestroySpace(lGripPoseSpace);
+    xrDestroySpace(rGripPoseSpace);
+    xrDestroySpace(lAimPoseSpace);
+    xrDestroySpace(rAimPoseSpace);
+    
+    xrDestroySession(xrSession);
+}
+
+void OpenxrSession::InitializeSession()
+{
+    SYSTRACE_NAME("OpenxrSession::InitializeSession");
+
+    XrGraphicsBindingVulkanKHR vkBinding{XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR};
+    vkBinding.instance = platform->mImpl->mInstance;
+    vkBinding.physicalDevice = platform->mImpl->mPhysicalDevice;
+    vkBinding.device = platform->mImpl->mDevice;
+    vkBinding.queueFamilyIndex = platform->mImpl->mGraphicsQueueIndex;
+    vkBinding.queueIndex = 0;
+
+    PFN_xrGetVulkanGraphicsDeviceKHR xrGetVulkanGraphicsDeviceKHR;
+    CHK_XRCMD2(xrGetInstanceProcAddr(
+        platform->xrInstance, "xrGetVulkanGraphicsDeviceKHR",
+        reinterpret_cast<PFN_xrVoidFunction*>(&xrGetVulkanGraphicsDeviceKHR)));
+
+    // Ensure the physical device used by Vulkan renderer has a VR headset connected.
+    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+    xrGetVulkanGraphicsDeviceKHR(platform->xrInstance, platform->xrSystemId,
+        platform->mImpl->mInstance, &physicalDevice);
+    if (physicalDevice != platform->mImpl->mPhysicalDevice)
+    {
+        utils::slog.e << "Physical devices used by OpenXR and Vulkan are different."
+            << utils::io::endl;
+        throw;
+    }
+
+    XrSessionCreateInfo createInfo{XR_TYPE_SESSION_CREATE_INFO};
+    createInfo.next = &vkBinding;
+    createInfo.systemId = platform->xrSystemId;
+    CHK_XRCMD2(xrCreateSession(platform->xrInstance, &createInfo, &xrSession));
+
+    sessionState = XR_SESSION_STATE_IDLE;
+}
+
+void OpenxrSession::InitializeSpaces()
+{
+    SYSTRACE_NAME("OpenxrSession::InitializeSpaces");
+
+    uint32_t spaceCount;
+    CHK_XRCMD2(xrEnumerateReferenceSpaces(xrSession, 0, &spaceCount, nullptr));
+    std::vector<XrReferenceSpaceType> spaces(spaceCount);
+    CHK_XRCMD2(xrEnumerateReferenceSpaces(xrSession, spaceCount, &spaceCount, spaces.data()));
+
+    utils::slog.i << "[OpenXR] Available reference spaces: " 
+        << std::to_string(spaceCount)
+        << utils::io::endl;
+
+    for (XrReferenceSpaceType space: spaces)
+    {
+        std::string spaceName;
+        switch (space)
+        {
+        case XR_REFERENCE_SPACE_TYPE_VIEW:
+            spaceName = "XR_REFERENCE_SPACE_TYPE_VIEW";
+            break;
+        case XR_REFERENCE_SPACE_TYPE_LOCAL:
+            spaceName = "XR_REFERENCE_SPACE_TYPE_LOCAL";
+            break;
+        case XR_REFERENCE_SPACE_TYPE_STAGE:
+            spaceName = "XR_REFERENCE_SPACE_TYPE_STAGE";
+            break;
+        default:
+            spaceName = "Unknown reference space: " + std::to_string(space);
+            break;
+        }
+        utils::slog.i << "[OpenXR] Referenece space: " << spaceName << utils::io::endl;
+    }
+    
+    if (spaceCount != 3) {
+        utils::slog.i << "[OpenXR] Reference space check failed."
+            << utils::io::endl;
+    }
+
+    {   // Create reference spaces
+        XrReferenceSpaceCreateInfo createInfo
+            {XR_TYPE_REFERENCE_SPACE_CREATE_INFO};
+        createInfo.poseInReferenceSpace.orientation.w = 1.0f;
+        createInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
+        CHK_XRCMD2(xrCreateReferenceSpace(xrSession, &createInfo, &viewSpace));
+        createInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL;
+        CHK_XRCMD2(xrCreateReferenceSpace(xrSession, &createInfo, &localSpace));
+        createInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
+        CHK_XRCMD2(xrCreateReferenceSpace(xrSession, &createInfo, &stageSpace));
+    }
+
+    {   // Create action spaces
+        XrActionSpaceCreateInfo createInfo{XR_TYPE_ACTION_SPACE_CREATE_INFO};
+        createInfo.poseInActionSpace.orientation.w = 1.0f;
+        createInfo.action = platform->lGripPoseAction;
+        CHK_XRCMD2(xrCreateActionSpace(xrSession, &createInfo, &lGripPoseSpace));
+        createInfo.action = platform->rGripPoseAction;
+        CHK_XRCMD2(xrCreateActionSpace(xrSession, &createInfo, &rGripPoseSpace));
+        createInfo.action = platform->lAimPoseAction;
+        CHK_XRCMD2(xrCreateActionSpace(xrSession, &createInfo, &lAimPoseSpace));
+        createInfo.action = platform->rAimPoseAction;
+        CHK_XRCMD2(xrCreateActionSpace(xrSession, &createInfo, &rAimPoseSpace));
+    }
+}
+
+bool OpenxrSession::ShouldCloseSession()
+{
+    SYSTRACE_NAME("OpenxrSession::ShouldCloseSeesion");
+    
+    if (sessionState == XR_SESSION_STATE_EXITING ||
+        sessionState == XR_SESSION_STATE_LOSS_PENDING)
+    {
+        return true;
+    }
+
+    return false;
+}
+
+void OpenxrSession::RequestCloseSession()
+{
+    xrRequestExitSession(xrSession);
+}
+
+void OpenxrSession::SetSessionState(XrSessionState newState)
+{
+    SYSTRACE_NAME("OpenxrSession::SetSessionState");
+
+    static const std::vector<std::string> stateNames
+    {
+        "XR_SESSION_STATE_UNKNOWN",
+        "XR_SESSION_STATE_IDLE",
+        "XR_SESSION_STATE_READY",
+        "XR_SESSION_STATE_SYNCHRONIZED",
+        "XR_SESSION_STATE_VISIBLE",
+        "XR_SESSION_STATE_FOCUSED",
+        "XR_SESSION_STATE_STOPPING",
+        "XR_SESSION_STATE_LOSS_PENDING",
+        "XR_SESSION_STATE_EXITING",
+    };
+
+    utils::slog.i << "[OpenXR] Session state changes from "
+        << stateNames[sessionState] << " to " << stateNames[newState]
+        << utils::io::endl;
+
+    sessionState = newState;
+
+    switch (sessionState)
+    {
+        case XR_SESSION_STATE_READY:
+        {
+            XrSessionBeginInfo info{XR_TYPE_SESSION_BEGIN_INFO};
+            info.primaryViewConfigurationType = 
+                XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+            CHK_XRCMD2(xrBeginSession(xrSession, &info));
+            eye = 0;
+            frameState = {XR_TYPE_FRAME_STATE};
+            break;
+        }
+        case XR_SESSION_STATE_STOPPING:
+        {
+            CHK_XRCMD2(xrEndSession(xrSession));
+            eye = 0;
+            frameState = {XR_TYPE_FRAME_STATE};
+            break;
+        }
+        case XR_SESSION_STATE_EXITING:
+        {
+            break;
+        }
+        case XR_SESSION_STATE_LOSS_PENDING:
+        {
+            // could not be tested.
+            break;
+        }
+        default:
+            break;
+    }
 }
 
 }// namespace filament::backend

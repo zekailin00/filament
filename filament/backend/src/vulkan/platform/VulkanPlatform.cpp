@@ -40,11 +40,9 @@ using namespace bluevk;
 
 namespace filament::backend {
 
+#include "VulkanPlatformPrivate.inc"
+
 namespace {
-
-constexpr uint32_t const INVALID_VK_INDEX = 0xFFFFFFFF;
-
-typedef std::unordered_set<std::string_view> ExtensionSet;
 
 #if FVK_ENABLED(FVK_DEBUG_VALIDATION)
 // These strings need to be allocated outside a function stack
@@ -153,59 +151,6 @@ void printDepthFormats(VkPhysicalDevice device) {
 }
 #endif
 
-ExtensionSet getInstanceExtensions() {
-    SYSTRACE_CALL();
-    std::string_view const TARGET_EXTS[] = {
-            // Request all cross-platform extensions.
-            VK_KHR_SURFACE_EXTENSION_NAME,
-            VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
-
-            // Request these if available.
-            VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-            VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
-
-#if FVK_ENABLED(FVK_DEBUG_VALIDATION)
-            VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
-#endif
-    };
-    ExtensionSet exts;
-    FixedCapacityVector<VkExtensionProperties> const availableExts
-            = filament::backend::enumerate(vkEnumerateInstanceExtensionProperties,
-                    static_cast<char const*>(nullptr) /* pLayerName */);
-    for (auto const& extProps: availableExts) {
-        for (auto const& targetExt: TARGET_EXTS) {
-            if (targetExt == extProps.extensionName) {
-                exts.insert(targetExt);
-            }
-        }
-    }
-    return exts;
-}
-
-ExtensionSet getDeviceExtensions(VkPhysicalDevice device) {
-    SYSTRACE_CALL();
-    std::string_view const TARGET_EXTS[] = {
-            VK_EXT_DEBUG_MARKER_EXTENSION_NAME,
-            VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME,
-            VK_KHR_MAINTENANCE1_EXTENSION_NAME,
-            VK_KHR_MAINTENANCE2_EXTENSION_NAME,
-            VK_KHR_MAINTENANCE3_EXTENSION_NAME,
-    };
-    ExtensionSet exts;
-    // Identify supported physical device extensions
-    FixedCapacityVector<VkExtensionProperties> const extensions
-            = filament::backend::enumerate(vkEnumerateDeviceExtensionProperties, device,
-                    static_cast<const char*>(nullptr) /* pLayerName */);
-    for (auto const& extension: extensions) {
-        for (auto const& targetExt: TARGET_EXTS) {
-            if (targetExt == extension.extensionName) {
-                exts.insert(targetExt);
-            }
-        }
-    }
-    return exts;
-}
-
 VkInstance createInstance(ExtensionSet const& requiredExts) {
     SYSTRACE_CALL();
     VkInstance instance;
@@ -241,7 +186,7 @@ VkInstance createInstance(ExtensionSet const& requiredExts) {
 
     // The Platform class can require 1 or 2 instance extensions, plus we'll request at most 5
     // instance extensions here in the common code. So that's a max of 7.
-    static constexpr uint32_t MAX_INSTANCE_EXTENSION_COUNT = 8;
+    static constexpr uint32_t MAX_INSTANCE_EXTENSION_COUNT = 32;
     const char* ppEnabledExtensions[MAX_INSTANCE_EXTENSION_COUNT];
     uint32_t enabledExtensionCount = 0;
 
@@ -546,25 +491,6 @@ VkFormatList findAttachmentDepthFormats(VkPhysicalDevice device) {
 
 }// anonymous namespace
 
-using SwapChainPtr = VulkanPlatform::SwapChainPtr;
-
-struct VulkanPlatformPrivate {
-    VkInstance mInstance = VK_NULL_HANDLE;
-    VkPhysicalDevice mPhysicalDevice = VK_NULL_HANDLE;
-    VkDevice mDevice = VK_NULL_HANDLE;
-    uint32_t mGraphicsQueueFamilyIndex = INVALID_VK_INDEX;
-    uint32_t mGraphicsQueueIndex = INVALID_VK_INDEX;
-    VkQueue mGraphicsQueue = VK_NULL_HANDLE;
-    VulkanContext mContext = {};
-
-    // We use a map to both map a handle (i.e. SwapChainPtr) to the concrete type and also to
-    // store the actual swapchain struct, which is either backed-by-surface or headless.
-    std::unordered_set<SwapChainPtr> mSurfaceSwapChains;
-    std::unordered_set<SwapChainPtr> mHeadlessSwapChains;
-
-    bool mSharedContext = false;
-};
-
 void VulkanPlatform::terminate() {
     SYSTRACE_CALL();
     for (auto swapchain: mImpl->mHeadlessSwapChains) {
@@ -786,6 +712,60 @@ uint32_t VulkanPlatform::getGraphicsQueueIndex() const noexcept {
 
 VkQueue VulkanPlatform::getGraphicsQueue() const noexcept {
     return mImpl->mGraphicsQueue;
+}
+
+
+ExtensionSet VulkanPlatform::getInstanceExtensions() {
+    SYSTRACE_CALL();
+    std::string_view const TARGET_EXTS[] = {
+            // Request all cross-platform extensions.
+            VK_KHR_SURFACE_EXTENSION_NAME,
+            VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
+
+            // Request these if available.
+            VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+            VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
+
+#if FVK_ENABLED(FVK_DEBUG_VALIDATION)
+            VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
+#endif
+    };
+    ExtensionSet exts;
+    FixedCapacityVector<VkExtensionProperties> const availableExts
+            = filament::backend::enumerate(vkEnumerateInstanceExtensionProperties,
+                    static_cast<char const*>(nullptr) /* pLayerName */);
+    for (auto const& extProps: availableExts) {
+        for (auto const& targetExt: TARGET_EXTS) {
+            if (targetExt == extProps.extensionName) {
+                exts.insert(targetExt);
+            }
+        }
+    }
+    return exts;
+}
+
+ExtensionSet VulkanPlatform::getDeviceExtensions(VkPhysicalDevice device) {
+    SYSTRACE_CALL();
+    std::string_view const TARGET_EXTS[] = {
+            VK_EXT_DEBUG_MARKER_EXTENSION_NAME,
+            VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME,
+            VK_KHR_MAINTENANCE1_EXTENSION_NAME,
+            VK_KHR_MAINTENANCE2_EXTENSION_NAME,
+            VK_KHR_MAINTENANCE3_EXTENSION_NAME,
+    };
+    ExtensionSet exts;
+    // Identify supported physical device extensions
+    FixedCapacityVector<VkExtensionProperties> const extensions
+            = filament::backend::enumerate(vkEnumerateDeviceExtensionProperties, device,
+                    static_cast<const char*>(nullptr) /* pLayerName */);
+    for (auto const& extension: extensions) {
+        for (auto const& targetExt: TARGET_EXTS) {
+            if (targetExt == extension.extensionName) {
+                exts.insert(targetExt);
+            }
+        }
+    }
+    return exts;
 }
 
 #undef SWAPCHAIN_RET_FUNC

@@ -86,8 +86,8 @@ using namespace bluevk;
 
 namespace filament::backend {
 
-VulkanPlatform::ExtensionSet VulkanPlatform::getRequiredInstanceExtensions() {
-    VulkanPlatform::ExtensionSet ret;
+ExtensionSet VulkanPlatform::getRequiredInstanceExtensions() {
+    ExtensionSet ret;
     #if defined(__ANDROID__)
         ret.insert("VK_KHR_android_surface");
     #elif defined(__linux__) && defined(FILAMENT_SUPPORTS_WAYLAND)

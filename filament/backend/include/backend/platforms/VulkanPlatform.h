@@ -35,6 +35,7 @@
 namespace filament::backend {
 
 using SwapChain = Platform::SwapChain;
+using ExtensionSet = std::unordered_set<std::string_view>;
 
 /**
  * Private implementation details for the provided vulkan platform.
@@ -44,7 +45,7 @@ struct VulkanPlatformPrivate;
 /**
  * A Platform interface that creates a Vulkan backend.
  */
-class VulkanPlatform : public Platform, utils::PrivateImplementation<VulkanPlatformPrivate> {
+class VulkanPlatform : public Platform, public utils::PrivateImplementation<VulkanPlatformPrivate> {
 public:
 
     /**
@@ -235,9 +236,12 @@ public:
      */
     VkQueue getGraphicsQueue() const noexcept;
 
+protected:
+    virtual ExtensionSet getInstanceExtensions();
+    virtual ExtensionSet getDeviceExtensions(VkPhysicalDevice device);
+
 private:
     // Platform dependent helper methods
-    using ExtensionSet = std::unordered_set<std::string_view>;
     static ExtensionSet getRequiredInstanceExtensions();
 
     using SurfaceBundle = std::tuple<VkSurfaceKHR, VkExtent2D>;

@@ -30,6 +30,10 @@
 
 #include <camutils/Manipulator.h>
 
+#if defined(FILAMENT_SUPPORTS_OPENXR)
+#include <backend/platforms/VulkanOpenxrPlatform.h>
+#endif
+
 #include <utils/Path.h>
 #include <utils/Entity.h>
 
@@ -258,6 +262,9 @@ private:
 
 #if defined(FILAMENT_DRIVER_SUPPORTS_VULKAN)
     filament::backend::VulkanPlatform* mVulkanPlatform = nullptr;
+#if defined(FILAMENT_SUPPORTS_OPENXR)
+    filament::backend::OpenxrSession* openxrSession = nullptr;
+#endif
 #endif
 };
 

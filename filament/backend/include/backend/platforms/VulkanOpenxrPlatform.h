@@ -20,31 +20,34 @@ public:
     //  */
     static VulkanOpenxrPlatform* Initialize();
 
-    OpenxrSession* NewSession();
-    void Destroy();
+    OpenxrSession* CreateSession();
+    void DestroySession(OpenxrSession*& openxrSession);
 
     void PollEvents();
-    void PollActions();
-
-    std::vector<const char*> GetVkInstanceExt() {return vulkanInstanceExt;}
-    std::vector<const char*> GetVkDeviceExt() {return vulkanDeviceExt;}
 
     const VulkanOpenxrPlatform& operator=(const VulkanOpenxrPlatform&) = delete;
     VulkanOpenxrPlatform(const VulkanOpenxrPlatform&) = delete;
 
-    ~VulkanOpenxrPlatform() override = default;
+    ~VulkanOpenxrPlatform() override {
+        Destroy();
+    }
 
     friend OpenxrSession;
 
+protected:
+    ExtensionSet getInstanceExtensions() override;
+    ExtensionSet getDeviceExtensions(VkPhysicalDevice device) override;
+
 private:
     VulkanOpenxrPlatform() = default;
+    void Destroy();
 
     bool TryReadNextEvent(XrEventDataBuffer* eventDataBuffer);
 
     void InitializeActions();
     void LoadViewConfig();
     void LoadVulkanRequirements();
-    std::vector<const char*> ParseExtensionString(char* names);
+    ExtensionSet ParseExtensionString(char* names);
 
 private:
     //------- Instance data -------//
@@ -55,22 +58,24 @@ private:
 
     XrGraphicsRequirementsVulkanKHR vkRequirements{};
     std::vector<char> vulkanInstanceExtStr;
-    std::vector<const char*> vulkanInstanceExt{};
+    ExtensionSet vulkanInstanceExt{};
     std::vector<char> vulkanDeviceExtStr;
-    std::vector<const char*> vulkanDeviceExt{};
+    ExtensionSet vulkanDeviceExt{};
 
     XrInstance xrInstance = XR_NULL_HANDLE;
     XrSystemId xrSystemId = XR_NULL_SYSTEM_ID;
     XrActionSet inputActionSet = XR_NULL_HANDLE;
     OpenxrSession* activeSession = nullptr;
 
+    friend OpenxrSession;
+
     //--------- Actions ----------//
     XrAction lSqueezeValueAction, rSqueezeValueAction;
     XrAction lTriggerValueAction, rTriggerValueAction;
     XrAction lTriggerTouchAction, rTriggerTouchAction;
 
-    XrAction lThumbstickXAction, rThumbstickXAction;
-    XrAction lThumbstickYAction, rThumbstickYAction;
+    XrAction lThumbstickXAction,     rThumbstickXAction;
+    XrAction lThumbstickYAction,     rThumbstickYAction;
     XrAction lThumbstickClickAction, rThumbstickClickAction;
     XrAction lThumbstickTouchAction, rThumbstickTouchAction;
 
@@ -79,84 +84,48 @@ private:
     XrAction lMenuClickAction, rSystemClickAction;
 
     XrAction lGripPoseAction, rGripPoseAction;
-    XrAction lAimPoseAction, rAimPoseAction;
+    XrAction lAimPoseAction,  rAimPoseAction;
 };
 
 
 class OpenxrSession
 {
 public:
-    void SetOpenxrContext(VulkanOpenxrPlatform* platform)
-    {
-        this->platform = platform;
-    }
-
     void SetSessionState(XrSessionState newState);
     bool ShouldCloseSession();
     void RequestCloseSession();
-    bool IsSessionRunning();
 
+    // CreateSwapchain
+    void PollActions();
     void BeginFrame();
     void EndFrame();
 
     XrSessionState GetSessionState() {return sessionState;}
     XrSession GetSession() {return xrSession;}
 
-    // XrSpace GetViewSpace() {return viewSpace;}
-    // XrSpace GetLocalSpace() {return localSpace;}
-    // XrSpace GetStageSpace() {return stageSpace;}
+    XrSpace GetViewSpace() {return viewSpace;}
+    XrSpace GetLocalSpace() {return localSpace;}
+    XrSpace GetStageSpace() {return stageSpace;}
 
-    // XrSpace GetLGripPoseSpace() {return lGripPoseSpace;}
-    // XrSpace GetRGripPoseSpace() {return rGripPoseSpace;}
-    // XrSpace GetLAimPoseSpace() {return lAimPoseSpace;}
-    // XrSpace GetRAimPoseSpace() {return rAimPoseSpace;}
-
-public:
-    // // Swapchain interface
-    // VkFormat GetImageFormat() override;
-    // uint32_t GetImageCount() override;
-    // uint32_t GetWidth() override;
-    // uint32_t GetHeight() override;
-
-    // VkImage GetImage(int index) override;
-    // VkImageView GetImageView(int index) override;
-    // VkFramebuffer* GetFramebuffer(int index) override;
-
-    void Initialize(VulkanDevice* vulkanDevice);
-    void Destroy(VulkanDevice* vulkanDevice);
-
-    // uint32_t GetNextImageIndex(VulkanDevice* vulkanDevice,
-    //     VkSemaphore imageAcquiredSemaphores) override;
-    // void PresentImage(VulkanDevice* vulkanDevice,
-    //     VkSemaphore renderFinishedSemaphores, uint32_t imageIndex) override;
-    // bool ShouldRender() override;
-
-    // void RebuildSwapchain(VulkanDevice* vulkanDevice) override;
+    XrSpace GetLGripPoseSpace() {return lGripPoseSpace;}
+    XrSpace GetRGripPoseSpace() {return rGripPoseSpace;}
+    XrSpace GetLAimPoseSpace() {return lAimPoseSpace;}
+    XrSpace GetRAimPoseSpace() {return rAimPoseSpace;}
 
 private:
-    // Helper methods
-    void CreateSession(VulkanDevice* vukanDevice);
+    // Helper methods called by Initialize()
+    void InitializeSession();
     void InitializeSpaces();
-    bool SelectImageFormat(VkFormat format);
-    void PrintErrorMsg(XrResult result);
+
+    void Initialize(VulkanOpenxrPlatform* platform);
+    void Destroy();
 
 private:    
+    friend VulkanOpenxrPlatform;
     VulkanOpenxrPlatform* platform = nullptr;
 
-
     XrSession xrSession = XR_NULL_HANDLE;
-    std::vector<XrSwapchain> swapchainList{};
-    std::vector<VkImage> images{};
-    std::vector<VkImageView> imageViews{};
-    std::vector<VkFramebuffer> framebuffers{};
-
     XrSessionState sessionState = XR_SESSION_STATE_UNKNOWN;
-
-    int64_t imageFormat = 0;
-    uint32_t totalImageCount = 0; //Total images (per eye * 2)
-    uint32_t imageCount = 0;
-    uint32_t imageWidth = 0;
-    uint32_t imageHeight = 0;
 
 
     XrSpace viewSpace = VK_NULL_HANDLE;

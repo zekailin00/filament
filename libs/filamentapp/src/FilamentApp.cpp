@@ -47,6 +47,9 @@
 
 #if defined(FILAMENT_DRIVER_SUPPORTS_VULKAN)
 #include <backend/platforms/VulkanPlatform.h>
+#if defined(FILAMENT_SUPPORTS_OPENXR)
+#include <backend/platforms/VulkanOpenxrPlatform.h>
+#endif
 #endif
 
 #include <filagui/ImGuiHelper.h>
@@ -605,21 +608,20 @@ FilamentApp::Window::Window(FilamentApp* filamentApp,
         engineConfig.stereoscopicEyeCount = config.stereoscopicEyeCount;
 
         if (backend == Engine::Backend::VULKAN) {
-            #if defined(FILAMENT_DRIVER_SUPPORTS_VULKAN)
-                mFilamentApp->mVulkanPlatform =
-                #if defined(FILAMENT_SUPPORTS_OPENXR)
-                    new VulkanOpenxrPlatform()::Initialize();
-                    //TODO: Check it is not NULL
-                #else
-                    new FilamentAppVulkanPlatform(config.vulkanGPUHint.c_str());
-                #endif
+#if defined(FILAMENT_DRIVER_SUPPORTS_VULKAN)
+#if defined(FILAMENT_SUPPORTS_OPENXR)
+                mFilamentApp->mVulkanPlatform = VulkanOpenxrPlatform::Initialize();
+                assert(mFilamentApp->mVulkanPlatform != nullptr);
+#else
+                mFilamentApp->mVulkanPlatform = new FilamentAppVulkanPlatform(config.vulkanGPUHint.c_str());
+#endif
                 return Engine::Builder()
                         .backend(backend)
                         .platform(mFilamentApp->mVulkanPlatform)
                         .featureLevel(config.featureLevel)
                         .config(&engineConfig)
                         .build();
-            #endif
+#endif
         }
         return Engine::Builder()
                 .backend(backend)
@@ -641,7 +643,11 @@ FilamentApp::Window::Window(FilamentApp* filamentApp,
         // For single-threaded platforms, we need to ensure that Filament's OpenGL context is
         // current, rather than the one created by SDL.
         mFilamentApp->mEngine = createEngine();
-
+#if defined(FILAMENT_SUPPORTS_OPENXR)
+        mFilamentApp->openxrSession = dynamic_cast<VulkanOpenxrPlatform*>(
+            mFilamentApp->mVulkanPlatform)->CreateSession();
+            assert(mFilamentApp->openxrSession);
+#endif
         // get the resolved backend
         mBackend = config.backend = mFilamentApp->mEngine->getBackend();
 
