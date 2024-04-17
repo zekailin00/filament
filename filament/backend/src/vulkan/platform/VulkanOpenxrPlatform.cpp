@@ -57,8 +57,7 @@ namespace utility
 static void strcpy_s(char* dest, const char* src)
 {
     int i = 0;
-    while(src[i] != 0)
-    {
+    while(src[i] != 0) {
         dest[i] = src[i];
         i++;
     }
@@ -167,13 +166,6 @@ VulkanOpenxrPlatform* VulkanOpenxrPlatform::Initialize()
     return platform;
 }
 
-void VulkanOpenxrPlatform::Destroy()
-{
-    SYSTRACE_NAME("OpenxrPlatform::Destroy");
-    xrDestroyActionSet(inputActionSet);
-    xrDestroyInstance(xrInstance);
-}
-
 OpenxrSession* VulkanOpenxrPlatform::CreateSession()
 {
     SYSTRACE_NAME("OpenxrPlatform::CreateSession");
@@ -238,10 +230,8 @@ void VulkanOpenxrPlatform::LoadViewConfig()
         xrInstance, xrSystemId, count, &count, viewConfigTypeList.data()));
     
     bool configFound = false;
-    for (auto& configType: viewConfigTypeList)
-    {
-        if (configType == XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO)
-        {
+    for (auto& configType: viewConfigTypeList) {
+        if (configType == XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO) {
             configFound = true;
             break;
         }
@@ -467,10 +457,66 @@ SwapChainPtr VulkanOpenxrPlatform::createSwapChain(void* nativeWindow,
         assert(mImpl->mOpenxrSwapchain == nullptr);
         mImpl->mOpenxrSwapchain = swapchain;
         return swapchain;
-    }
-    else
-    {
+    } else {
         return VulkanPlatform::createSwapChain(nativeWindow, flags, extent);
+    }
+}
+
+VulkanPlatform::SwapChainBundle VulkanOpenxrPlatform::getSwapChainBundle(SwapChainPtr handle) {
+    SYSTRACE_CALL();
+    if (mImpl->mOpenxrSwapchain == handle) {
+        return static_cast<VulkanPlatformOpenxrSwapChain*>(handle)->getSwapChainBundle();
+    } else {
+        return VulkanPlatform::getSwapChainBundle(handle);
+    }
+}
+
+VkResult VulkanOpenxrPlatform::acquire(SwapChainPtr handle, VkSemaphore clientSignal, uint32_t* index) {
+    SYSTRACE_CALL();
+    if (mImpl->mOpenxrSwapchain == handle) {
+        return static_cast<VulkanPlatformOpenxrSwapChain*>(handle)
+            ->acquire(clientSignal, index);
+    } else {
+        return VulkanPlatform::acquire(handle, clientSignal, index);
+    }
+}
+
+VkResult VulkanOpenxrPlatform::present(SwapChainPtr handle, uint32_t index,
+        VkSemaphore finishedDrawing) {
+    SYSTRACE_CALL();
+    if (mImpl->mOpenxrSwapchain == handle) {
+        return static_cast<VulkanPlatformOpenxrSwapChain*>(handle)
+            ->present(index, finishedDrawing);
+    } else {
+        return VulkanPlatform::present(handle, index, finishedDrawing);
+    }
+}
+
+bool VulkanOpenxrPlatform::hasResized(SwapChainPtr handle) {
+    SYSTRACE_CALL();
+    if (mImpl->mOpenxrSwapchain == handle) {
+        return static_cast<VulkanPlatformOpenxrSwapChain*>(handle)->hasResized();
+    } else {
+        return VulkanPlatform::hasResized(handle);
+    }
+}
+
+VkResult VulkanOpenxrPlatform::recreate(SwapChainPtr handle) {
+    SYSTRACE_CALL();
+    if (mImpl->mOpenxrSwapchain == handle) {
+        return static_cast<VulkanPlatformOpenxrSwapChain*>(handle)->recreate();
+    } else {
+        return VulkanPlatform::recreate(handle);
+    }
+}
+
+void VulkanOpenxrPlatform::destroy(SwapChainPtr handle) {
+    SYSTRACE_CALL();
+    if (mImpl->mOpenxrSwapchain) {
+        delete static_cast<VulkanPlatformOpenxrSwapChain*>(handle);
+        mImpl->mOpenxrSwapchain = nullptr;
+    } else {
+        VulkanPlatform::destroy(handle);
     }
 }
 

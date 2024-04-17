@@ -32,13 +32,20 @@ public:
     VulkanOpenxrPlatform(const VulkanOpenxrPlatform&) = delete;
 
     ~VulkanOpenxrPlatform() override {
-        Destroy();
+        xrDestroyActionSet(inputActionSet);
+        xrDestroyInstance(xrInstance);
     }
 
-    friend OpenxrSession;
-
-    virtual SwapChainPtr createSwapChain(void* nativeWindow, uint64_t flags = 0,
-            VkExtent2D extent = {0, 0}) override;
+    virtual SwapChainPtr createSwapChain(void* nativeWindow,
+        uint64_t flags = 0, VkExtent2D extent = {0, 0}) override;
+    virtual SwapChainBundle getSwapChainBundle(SwapChainPtr handle) override;
+    virtual VkResult acquire(SwapChainPtr handle,
+        VkSemaphore clientSignal, uint32_t* index) override;
+    virtual VkResult present(SwapChainPtr handle,
+        uint32_t index, VkSemaphore finishedDrawing) override;
+    virtual bool hasResized(SwapChainPtr handle) override;
+    virtual VkResult recreate(SwapChainPtr handle) override;
+    virtual void destroy(SwapChainPtr handle) override;
 
 protected:
     ExtensionSet getInstanceExtensions() override;
@@ -46,7 +53,6 @@ protected:
 
 private:
     VulkanOpenxrPlatform() = default;
-    void Destroy();
 
     bool TryReadNextEvent(XrEventDataBuffer* eventDataBuffer);
 

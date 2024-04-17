@@ -396,9 +396,15 @@ VulkanPlatformOpenxrSwapChain::VulkanPlatformOpenxrSwapChain(
         << utils::io::endl;
 }
 
+VulkanPlatformOpenxrSwapChain::~VulkanPlatformOpenxrSwapChain()
+{
+    xrDestroySwapchain(mSwapchain);
+    mSession = nullptr;
+}
+
 VkResult VulkanPlatformOpenxrSwapChain::acquire(VkSemaphore clientSignal, uint32_t* index)
 {
-    SYSTRACE_NAME("OpenxrSession::GetNextImageIndex");
+    SYSTRACE_NAME("VulkanPlatformOpenxrSwapChain::acquire");
 
     XrSwapchainImageAcquireInfo acquireInfo{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
     CHK_XRCMD(xrAcquireSwapchainImage(swapchainList[mEye], &acquireInfo, &index));
@@ -424,7 +430,7 @@ VkResult VulkanPlatformOpenxrSwapChain::acquire(VkSemaphore clientSignal, uint32
 
 VkResult VulkanPlatformOpenxrSwapChain::present(uint32_t index, VkSemaphore finished)
 {
-    SYSTRACE_NAME("VulkanPlatformOpenxrSwapChain::PresentImage");
+    SYSTRACE_NAME("VulkanPlatformOpenxrSwapChain::present");
     XrSwapchainImageReleaseInfo info{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
     CHK_XRCMD(xrReleaseSwapchainImage(mSwapchain, &info));
     return VK_SUCCESS;

@@ -139,39 +139,13 @@ struct VulkanPlatformOpenxrSwapChain: public VulkanPlatformSwapChainImpl
     bool hasResized();
 
 private:
-    VkResult create();
     bool SelectImageFormat(VkFormat format);
 
-
-    // VkInstance mInstance;
-    // VkPhysicalDevice mPhysicalDevice;
-    // // This class takes ownership of the surface.
-    // VkSurfaceKHR mSurface;
-    // VkSwapchainKHR mSwapchain = VK_NULL_HANDLE;
-    // VkExtent2D const mFallbackExtent;
-
-    bool mUsesRGB = false;
     bool mHasStencil = false;
 
     OpenxrSession* mSession = nullptr;
     XrSwapchain mSwapchain;
-    // std::vector<VkImage> images{};
-    // std::vector<VkImageView> imageViews{};
-    // std::vector<VkFramebuffer> framebuffers{};
-
-    // int64_t imageFormat = 0;
-    // uint32_t imageCount = 0;
-    // VkExtent2D mExtent;
     int mEye = -1;
-
-    // // Render loop context
-    // // reset when enter XR_SESSION_STATE_READY
-    // // index 0 = left eye, index 1 = right eye
-    // XrFrameState frameState{};
-    // XrCompositionLayerProjection layer;
-    // XrCompositionLayerProjectionView layerViews[2]; 
-    // XrView views[2];
-    // int eye;
 };
 
 #endif
