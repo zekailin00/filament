@@ -10,7 +10,7 @@ namespace filament::backend {
 
 
 class OpenxrSession;
-class VulkanPlatformOpenxrSwapChain;
+struct VulkanPlatformOpenxrSwapChain;
 
 class VulkanOpenxrPlatform : public VulkanPlatform
 {
@@ -23,6 +23,7 @@ public:
     static VulkanOpenxrPlatform* Initialize();
 
     OpenxrSession* CreateSession();
+    OpenxrSession* GetActiveSession() {return activeSession;}
     void DestroySession(OpenxrSession*& openxrSession);
 
     void PollEvents();
@@ -102,8 +103,10 @@ public:
 
     // CreateSwapchain
     void PollActions();
-    void BeginFrame();
-    void EndFrame();
+    void XrBeginFrame();
+    void XrEndFrame();
+    void AsyncXrBeginFrame();
+    void AsyncXrEndFrame();
 
     XrSessionState GetSessionState() {return sessionState;}
     XrSession GetSession() {return xrSession;}

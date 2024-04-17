@@ -240,6 +240,8 @@ protected:
     virtual ExtensionSet getInstanceExtensions();
     virtual ExtensionSet getDeviceExtensions(VkPhysicalDevice device);
 
+    Driver* mDriver = nullptr;
+
 private:
     // Platform dependent helper methods
     static ExtensionSet getRequiredInstanceExtensions();

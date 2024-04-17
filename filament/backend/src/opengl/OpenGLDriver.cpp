@@ -3350,6 +3350,20 @@ void OpenGLDriver::endFrame(UTILS_UNUSED uint32_t frameId) {
     insertEventMarker("endFrame");
 }
 
+#if defined(FILAMENT_SUPPORTS_OPENXR)
+
+void OpenGLDriver::xrBeginFrame(int)
+{
+    PANIC_LOG("OpenXR is only supported by Vulkan backend");
+}
+
+void OpenGLDriver::xrEndFrame(int)
+{
+    PANIC_LOG("OpenXR is only supported by Vulkan backend");
+}
+
+#endif
+
 void OpenGLDriver::flush(int) {
     DEBUG_MARKER()
     auto& gl = mContext;

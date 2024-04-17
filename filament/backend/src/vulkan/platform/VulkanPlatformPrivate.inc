@@ -15,6 +15,7 @@ struct VulkanPlatformPrivate {
     // store the actual swapchain struct, which is either backed-by-surface or headless.
     std::unordered_set<SwapChainPtr> mSurfaceSwapChains;
     std::unordered_set<SwapChainPtr> mHeadlessSwapChains;
+    SwapChainPtr mOpenxrSwapchain;
 
     bool mSharedContext = false;
 };

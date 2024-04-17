@@ -21,11 +21,6 @@
 
 #include <backend/DriverEnums.h>
 
-//FIXME:
-#define CHECK_VKCMD(e)
-#define CHK_XRCMD(e)
-#define ASSERT(e)
-
 using namespace bluevk;
 using namespace utils;
 
@@ -317,9 +312,17 @@ VkResult VulkanPlatformSurfaceSwapChain::recreate() {
     return create();
 }
 
+#if defined(FILAMENT_SUPPORTS_OPENXR)
+
+//FIXME:
+#define CHECK_VKCMD(e)
+#define CHK_XRCMD(e)
+#define ASSERT(e)
+
+
 bool VulkanPlatformOpenxrSwapChain::SelectImageFormat(VkFormat format)
 {
-    ZoneScopedN("OpenxrSession::SelectImageFormat");
+    SYSTRACE_NAME("VulkanPlatformOpenxrSwapChain::SelectImageFormat");
 
     unsigned int count;
     std::vector<int64_t> formatList;
@@ -331,7 +334,7 @@ bool VulkanPlatformOpenxrSwapChain::SelectImageFormat(VkFormat format)
 
     for(int64_t& xrFormat: formatList) {
         if (xrFormat == format) {
-            this->imageFormat = xrFormat;
+             mSwapChainBundle.colorFormat = (VkFormat) xrFormat;
             return true;
         }
     }
@@ -342,11 +345,10 @@ VulkanPlatformOpenxrSwapChain::VulkanPlatformOpenxrSwapChain(
     VulkanContext const& context, VkDevice device, VkQueue queue,
     OpenxrSession* session, VkExtent2D extent, uint32_t sampleCount, uint64_t flags):
     VulkanPlatformSwapChainImpl(context, device, queue),
-    mSession(session), mExtent(extent), mEye(session->GetSwapchainIndex())
+    mSession(session), mEye(session->GetSwapchainIndex())
 {
-    if (!SelectImageFormat(VK_FORMAT_R8G8B8A8_SRGB))
-    {
-        utils::slog.e <<  "[OpenXR] Unable to Get image format"
+    if (!SelectImageFormat(VK_FORMAT_B8G8R8A8_UNORM)) {
+        utils::slog.e << "[OpenXR] Unable to Get image format"
             << utils::io::endl;
         throw;
     }
@@ -356,7 +358,7 @@ VulkanPlatformOpenxrSwapChain::VulkanPlatformOpenxrSwapChain(
         XrSwapchainCreateInfo createInfo{XR_TYPE_SWAPCHAIN_CREATE_INFO};
         createInfo.usageFlags = XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT |
                                 XR_SWAPCHAIN_USAGE_SAMPLED_BIT;
-        createInfo.format = imageFormat;
+        createInfo.format = mSwapChainBundle.colorFormat;
         createInfo.sampleCount = sampleCount;
         createInfo.width = extent.width;
         createInfo.height = extent.height;
@@ -371,38 +373,26 @@ VulkanPlatformOpenxrSwapChain::VulkanPlatformOpenxrSwapChain(
     uint32_t count;
     std::vector<XrSwapchainImageVulkanKHR> swapchainImages;
     xrEnumerateSwapchainImages(mSwapchain, 0, &count, nullptr);
-    imageCount = count;
+    mSwapChainBundle.colors.reserve(count);
+    mSwapChainBundle.colors.clear();
+    mSwapChainBundle.extent = extent;
 
     // Acquire images from the swapchain
     swapchainImages.resize(count, {XR_TYPE_SWAPCHAIN_IMAGE_VULKAN_KHR});
     xrEnumerateSwapchainImages(mSwapchain, count, &count, 
         reinterpret_cast<XrSwapchainImageBaseHeader*>(swapchainImages.data()));
     for (XrSwapchainImageVulkanKHR& header: swapchainImages) {
-        images.push_back(header.image);
+        mSwapChainBundle.colors.push_back(header.image);
     }
 
-    // Create image views
-    VkImageViewCreateInfo vkImageViewCreateInfo
-        {VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
-    vkImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    vkImageViewCreateInfo.format = static_cast<VkFormat>(imageFormat);
-    vkImageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_R;
-    vkImageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_G;
-    vkImageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_B;
-    vkImageViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_A;
-    vkImageViewCreateInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    // create depth image
+    mSwapChainBundle.depthFormat = selectDepthFormat(
+        mContext.getAttachmentDepthFormats(), mHasStencil);
+    mSwapChainBundle.depth = createImage(mSwapChainBundle.extent, mSwapChainBundle.depthFormat);
 
-    imageViews.resize(imageCount);
-    for (uint32_t i = 0; i < imageCount; i++)
-    {
-        vkImageViewCreateInfo.image = images[i];
-        CHECK_VKCMD(vkCreateImageView(device,
-            &vkImageViewCreateInfo, nullptr, &imageViews[i]));
-    }
-
-    framebuffers.resize(imageCount);
+    assert(count == mSwapChainBundle.colors.size());
     utils::slog.i << "[Openxr] Swapchains created with total image count: "
-        << std::to_string(imageCount)
+        << std::to_string(mSwapChainBundle.colors.size())
         << utils::io::endl;
 }
 
@@ -425,7 +415,8 @@ VkResult VulkanPlatformOpenxrSwapChain::acquire(VkSemaphore clientSignal, uint32
     mSession->layerViews[mEye].subImage.imageArrayIndex = 0;
     mSession->layerViews[mEye].subImage.imageRect.offset = {0, 0};
     mSession->layerViews[mEye].subImage.imageRect.extent = {
-        (int32_t) mExtent.width, (int32_t) mExtent.height
+        (int32_t) mSwapChainBundle.extent.width,
+        (int32_t) mSwapChainBundle.extent.height
     };
 
     return VK_SUCCESS;
@@ -433,7 +424,7 @@ VkResult VulkanPlatformOpenxrSwapChain::acquire(VkSemaphore clientSignal, uint32
 
 VkResult VulkanPlatformOpenxrSwapChain::present(uint32_t index, VkSemaphore finished)
 {
-    SYSTRACE_NAME("OpenxrSession::PresentImage");
+    SYSTRACE_NAME("VulkanPlatformOpenxrSwapChain::PresentImage");
     XrSwapchainImageReleaseInfo info{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
     CHK_XRCMD(xrReleaseSwapchainImage(mSwapchain, &info));
     return VK_SUCCESS;
@@ -450,6 +441,8 @@ bool VulkanPlatformOpenxrSwapChain::hasResized()
     // No resize window.
     return false;
 }
+
+#endif
 
 VulkanPlatformHeadlessSwapChain::VulkanPlatformHeadlessSwapChain(VulkanContext const& context,
         VkDevice device, VkQueue queue, VkExtent2D extent, uint64_t flags)

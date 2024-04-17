@@ -27,6 +27,10 @@
 
 #include <backend/platforms/VulkanPlatform.h>
 
+#if defined(FILAMENT_SUPPORTS_OPENXR)
+#include <backend/platforms/VulkanOpenxrPlatform.h>
+#endif
+
 #include <utils/CString.h>
 #include <utils/FixedCapacityVector.h>
 #include <utils/Panic.h>
@@ -305,6 +309,20 @@ void VulkanDriver::endFrame(uint32_t frameId) {
     collectGarbage();
     FVK_SYSTRACE_END();
 }
+
+#if defined(FILAMENT_SUPPORTS_OPENXR)
+
+void VulkanDriver::xrBeginFrame(int)
+{
+    dynamic_cast<VulkanOpenxrPlatform*>(this->mPlatform)->GetActiveSession()->AsyncXrBeginFrame();
+}
+
+void VulkanDriver::xrEndFrame(int)
+{
+    dynamic_cast<VulkanOpenxrPlatform*>(this->mPlatform)->GetActiveSession()->AsyncXrEndFrame();
+}
+
+#endif
 
 void VulkanDriver::flush(int) {
     FVK_SYSTRACE_CONTEXT();

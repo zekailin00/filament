@@ -68,6 +68,20 @@ void NoopDriver::setPresentationTime(int64_t monotonic_clock_ns) {
 void NoopDriver::endFrame(uint32_t frameId) {
 }
 
+#if defined(FILAMENT_SUPPORTS_OPENXR)
+
+void NoopDriver::xrBeginFrame(int)
+{
+    PANIC_LOG("OpenXR is only supported by Vulkan backend");
+}
+
+void NoopDriver::xrEndFrame(int)
+{
+    PANIC_LOG("OpenXR is only supported by Vulkan backend");
+}
+
+#endif
+
 void NoopDriver::flush(int) {
 }
 

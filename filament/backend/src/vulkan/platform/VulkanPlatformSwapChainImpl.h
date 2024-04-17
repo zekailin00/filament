@@ -152,17 +152,16 @@ private:
 
     bool mUsesRGB = false;
     bool mHasStencil = false;
-    bool mSuboptimal;
 
     OpenxrSession* mSession = nullptr;
     XrSwapchain mSwapchain;
-    std::vector<VkImage> images{};
-    std::vector<VkImageView> imageViews{};
-    std::vector<VkFramebuffer> framebuffers{};
+    // std::vector<VkImage> images{};
+    // std::vector<VkImageView> imageViews{};
+    // std::vector<VkFramebuffer> framebuffers{};
 
-    int64_t imageFormat = 0;
-    uint32_t imageCount = 0;
-    VkExtent2D mExtent;
+    // int64_t imageFormat = 0;
+    // uint32_t imageCount = 0;
+    // VkExtent2D mExtent;
     int mEye = -1;
 
     // // Render loop context

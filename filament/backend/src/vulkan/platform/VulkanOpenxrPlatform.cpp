@@ -375,7 +375,7 @@ void VulkanOpenxrPlatform::InitializeActions()
 
 void VulkanOpenxrPlatform::PollEvents()
 {
-    ZoneScopedN("OpenxrPlatform::PollEvents");
+    SYSTRACE_NAME("OpenxrPlatform::PollEvents");
 
     XrEventDataBuffer event{};
     while (TryReadNextEvent(&event))
@@ -436,7 +436,7 @@ void VulkanOpenxrPlatform::PollEvents()
 
 bool VulkanOpenxrPlatform::TryReadNextEvent(XrEventDataBuffer* eventDataBuffer)
 {
-    ZoneScopedN("OpenxrPlatform::TryReadNextEvent");
+    SYSTRACE_NAME("OpenxrPlatform::TryReadNextEvent");
 
     XrEventDataBaseHeader* baseHeader =
         reinterpret_cast<XrEventDataBaseHeader*>(eventDataBuffer);
@@ -456,10 +456,17 @@ SwapChainPtr VulkanOpenxrPlatform::createSwapChain(void* nativeWindow,
 {
     if (flags == backend::SWAP_CHAIN_CONFIG_OPENXR_SESSION)
     {
-        // VulkanPlatformOpenxrSwapChain* swapchain = new VulkanPlatformOpenxrSwapChain(
-        //         mImpl->mContext, mImpl->mDevice, mImpl->mGraphicsQueue, extent, flags);
-        // mImpl->mHeadlessSwapChains.insert(swapchain);
-        // return swapchain;
+        OpenxrSession* session = static_cast<OpenxrSession*>(nativeWindow);
+        VkExtent2D extent = {
+            viewConfigViewList[0].recommendedImageRectWidth,
+            viewConfigViewList[0].recommendedImageRectHeight};
+        uint32_t sampleCount = viewConfigViewList[0].maxSwapchainSampleCount;
+        VulkanPlatformOpenxrSwapChain* swapchain = new VulkanPlatformOpenxrSwapChain(
+                mImpl->mContext, mImpl->mDevice, mImpl->mGraphicsQueue,
+                session, extent, sampleCount, flags);
+        assert(mImpl->mOpenxrSwapchain == nullptr);
+        mImpl->mOpenxrSwapchain = swapchain;
+        return swapchain;
     }
     else
     {
@@ -472,14 +479,183 @@ void OpenxrSession::PollActions()
     
 }
 
-void OpenxrSession::BeginFrame()
+void OpenxrSession::XrBeginFrame()
 {
-
+    platform->mDriver->xrBeginFrame(0);
 }
 
-void OpenxrSession::EndFrame()
+void OpenxrSession::XrEndFrame()
 {
+    platform->mDriver->xrEndFrame(0);
+}
 
+void OpenxrSession::AsyncXrBeginFrame()
+{
+    SYSTRACE_NAME("OpenxrSession::AsyncXrBeginFrame");
+
+    if (sessionState == XR_SESSION_STATE_READY ||
+        sessionState == XR_SESSION_STATE_SYNCHRONIZED ||
+        sessionState == XR_SESSION_STATE_VISIBLE ||
+        sessionState == XR_SESSION_STATE_FOCUSED)
+    {
+        XrResult result;
+
+        // Wait for a new frame.
+        XrFrameWaitInfo frameWaitInfo {XR_TYPE_FRAME_WAIT_INFO};
+        frameState = {XR_TYPE_FRAME_STATE};
+        CHK_XRCMD2(result = xrWaitFrame(xrSession, &frameWaitInfo, &frameState));
+
+        if (result == XR_SESSION_LOSS_PENDING)
+        {
+            SetSessionState(XR_SESSION_STATE_LOSS_PENDING);
+            return;
+        }
+
+        // Begin frame immediately before GPU work
+        XrFrameBeginInfo frameBeginInfo {XR_TYPE_FRAME_BEGIN_INFO};
+        CHK_XRCMD2(result = xrBeginFrame(xrSession, &frameBeginInfo));
+
+        if (result == XR_SESSION_LOSS_PENDING)
+        {
+            SetSessionState(XR_SESSION_STATE_LOSS_PENDING);
+            return;
+        }
+
+        {   // Locate eyes
+            XrViewLocateInfo locateInfo {XR_TYPE_VIEW_LOCATE_INFO};
+            locateInfo.viewConfigurationType = 
+                XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+            locateInfo.displayTime = frameState.predictedDisplayTime;
+            locateInfo.space = localSpace;
+
+            XrViewState viewState{XR_TYPE_VIEW_STATE};
+            views[0] = {XR_TYPE_VIEW};
+            views[1] = {XR_TYPE_VIEW};
+            uint32_t count;
+            CHK_XRCMD2(xrLocateViews(
+                xrSession, &locateInfo, &viewState, 2, &count, views));
+
+            // Input* input = Input::GetInstance();
+            
+            // input->xr_left_eye_fov =
+            //     *reinterpret_cast<glm::vec4*>(&views[0].fov);
+            // input->xr_right_eye_fov =
+            //     *reinterpret_cast<glm::vec4*>(&views[1].fov);
+            // input->xr_left_eye_pos = 
+            //     *reinterpret_cast<glm::vec3*>(&views[0].pose.position);
+            // input->xr_right_eye_pos = 
+            //     *reinterpret_cast<glm::vec3*>(&views[1].pose.position);
+            // input->xr_left_eye_quat = 
+            //     *reinterpret_cast<glm::vec4*>(&views[0].pose.orientation);
+            // input->xr_right_eye_quat = 
+            //     *reinterpret_cast<glm::vec4*>(&views[1].pose.orientation);
+        }
+
+        {   // Locate hand aims
+            XrSpaceLocation lAimPoseLocation{XR_TYPE_SPACE_LOCATION};
+            xrLocateSpace(
+                lAimPoseSpace, localSpace,
+                frameState.predictedDisplayTime, &lAimPoseLocation
+            );
+
+            // EventLeftAimPose* eventLeftAimPose = new EventLeftAimPose();
+            // math::XrToTransform(
+            //     eventLeftAimPose->transform,
+            //     reinterpret_cast<glm::vec4*>(&lAimPoseLocation.pose.orientation),
+            //     reinterpret_cast<glm::vec3*>(&lAimPoseLocation.pose.position)
+            // );
+
+            // EventQueue::GetInstance()->Publish(
+            //     EventQueue::InputXR, eventLeftAimPose);
+
+            XrSpaceLocation rAimPoseLocation{XR_TYPE_SPACE_LOCATION};
+            xrLocateSpace(
+                rAimPoseSpace, localSpace,
+                frameState.predictedDisplayTime, &rAimPoseLocation
+            );
+
+            // EventRightAimPose* eventRightAimPose = new EventRightAimPose();
+            // math::XrToTransform(
+            //     eventRightAimPose->transform,
+            //     reinterpret_cast<glm::vec4*>(&rAimPoseLocation.pose.orientation),
+            //     reinterpret_cast<glm::vec3*>(&rAimPoseLocation.pose.position)
+            // );
+
+            // EventQueue::GetInstance()->Publish(
+            //     EventQueue::InputXR, eventRightAimPose);
+        }
+
+        {   // Locate hand grips
+            XrSpaceLocation lGripPoseLocation{XR_TYPE_SPACE_LOCATION};
+            xrLocateSpace(
+                lGripPoseSpace, localSpace,
+                frameState.predictedDisplayTime, &lGripPoseLocation
+            );
+
+            // EventLeftGripPose* eventLeftGripPose = new EventLeftGripPose();
+            // math::XrToTransform(
+            //     eventLeftGripPose->transform,
+            //     reinterpret_cast<glm::vec4*>(&lGripPoseLocation.pose.orientation),
+            //     reinterpret_cast<glm::vec3*>(&lGripPoseLocation.pose.position)
+            // );
+
+            // EventQueue::GetInstance()->Publish(
+            //     EventQueue::InputXR, eventLeftGripPose);
+
+            XrSpaceLocation rGripPoseLocation{XR_TYPE_SPACE_LOCATION};
+            xrLocateSpace(
+                rGripPoseSpace, localSpace,
+                frameState.predictedDisplayTime, &rGripPoseLocation
+            );
+
+            // EventRightGripPose* eventRightGripPose = new EventRightGripPose();
+            // math::XrToTransform(
+            //     eventRightGripPose->transform,
+            //     reinterpret_cast<glm::vec4*>(&rGripPoseLocation.pose.orientation),
+            //     reinterpret_cast<glm::vec3*>(&rGripPoseLocation.pose.position)
+            // );
+
+            // EventQueue::GetInstance()->Publish(
+            //     EventQueue::InputXR, eventRightGripPose);
+        }
+    }
+}
+
+void OpenxrSession::AsyncXrEndFrame()
+{
+    SYSTRACE_NAME("OpenxrSession::AsyncXrEndFrame");
+
+    if (sessionState == XR_SESSION_STATE_READY ||
+        sessionState == XR_SESSION_STATE_SYNCHRONIZED ||
+        sessionState == XR_SESSION_STATE_VISIBLE ||
+        sessionState == XR_SESSION_STATE_FOCUSED)
+    {
+        XrResult result;
+        XrCompositionLayerProjection layer;
+        layer.type = XR_TYPE_COMPOSITION_LAYER_PROJECTION;
+        layer.next = 0;
+        layer.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
+        layer.space = localSpace;
+        layer.viewCount = 2;
+        layer.views = layerViews;
+
+        const XrCompositionLayerBaseHeader* pLayer =
+            reinterpret_cast<XrCompositionLayerBaseHeader*>(&layer);
+
+        XrFrameEndInfo frameEndInfo {XR_TYPE_FRAME_END_INFO};
+        frameEndInfo.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+        frameEndInfo.displayTime = frameState.predictedDisplayTime;
+        frameEndInfo.layerCount = 1;
+        frameEndInfo.layers = &pLayer;
+        
+        CHK_XRCMD2(result = xrEndFrame(xrSession, &frameEndInfo));
+
+        if (result == XR_SESSION_LOSS_PENDING)
+        {
+            SetSessionState(XR_SESSION_STATE_LOSS_PENDING);
+            return;
+        }
+    }
 }
 
 void OpenxrSession::Initialize(VulkanOpenxrPlatform* platform)
