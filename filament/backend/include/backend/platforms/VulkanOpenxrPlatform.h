@@ -134,12 +134,13 @@ private:
     void Initialize(VulkanOpenxrPlatform* platform);
     void Destroy();
 
-    //FIXME: Get view index from swapchain???
-    int GetSwapchainIndex() {return eyeCreated++;}
+private: // VulkanPlatformOpenxrSwapChain
+    friend VulkanPlatformOpenxrSwapChain;
+    int GetSwapchainIndex() {return eyeCreated++;} //FIXME: view index ???
+    XrInstance GetXrInstance() {return platform->xrInstance;}
 
 private:    
     friend VulkanOpenxrPlatform;
-    friend VulkanPlatformOpenxrSwapChain;
     VulkanOpenxrPlatform* platform = nullptr;
 
     XrSession xrSession = XR_NULL_HANDLE;

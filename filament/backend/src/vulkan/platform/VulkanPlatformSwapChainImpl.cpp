@@ -314,10 +314,15 @@ VkResult VulkanPlatformSurfaceSwapChain::recreate() {
 
 #if defined(FILAMENT_SUPPORTS_OPENXR)
 
-//FIXME:
-#define CHECK_VKCMD(e)
-#define CHK_XRCMD(e)
-#define ASSERT(e)
+#define CHK_XRCMD(result) do {                                              \
+    XrResult res = result;                                                  \
+    if (XR_FAILED(res)) {                                                   \
+    char resultBuffer[XR_MAX_STRUCTURE_NAME_SIZE];                          \
+    xrResultToString(mSession->GetXrInstance(), res, resultBuffer);         \
+    utils::slog.i << "[OpenXR] API call error: "                            \
+        << std::string(resultBuffer)                                        \
+        << utils::io::endl;                                                 \
+} } while(0)
 
 
 bool VulkanPlatformOpenxrSwapChain::SelectImageFormat(VkFormat format)
@@ -407,11 +412,11 @@ VkResult VulkanPlatformOpenxrSwapChain::acquire(VkSemaphore clientSignal, uint32
     SYSTRACE_NAME("VulkanPlatformOpenxrSwapChain::acquire");
 
     XrSwapchainImageAcquireInfo acquireInfo{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
-    CHK_XRCMD(xrAcquireSwapchainImage(swapchainList[mEye], &acquireInfo, &index));
+    CHK_XRCMD(xrAcquireSwapchainImage(mSwapchain, &acquireInfo, index));
 
     XrSwapchainImageWaitInfo waitInfo{XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
     waitInfo.timeout = XR_INFINITE_DURATION;
-    CHK_XRCMD(xrWaitSwapchainImage(swapchainList[mEye], &waitInfo));
+    CHK_XRCMD(xrWaitSwapchainImage(mSwapchain, &waitInfo));
 
     mSession->layerViews[mEye].type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW;
     mSession->layerViews[mEye].next = 0;

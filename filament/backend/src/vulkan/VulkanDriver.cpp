@@ -310,19 +310,24 @@ void VulkanDriver::endFrame(uint32_t frameId) {
     FVK_SYSTRACE_END();
 }
 
-#if defined(FILAMENT_SUPPORTS_OPENXR)
 
 void VulkanDriver::xrBeginFrame(int)
 {
+#if defined(FILAMENT_SUPPORTS_OPENXR)
     dynamic_cast<VulkanOpenxrPlatform*>(this->mPlatform)->GetActiveSession()->AsyncXrBeginFrame();
+#else
+    PANIC_LOG("OpenXR support is not enabled.")
+#endif
 }
 
 void VulkanDriver::xrEndFrame(int)
 {
+#if defined(FILAMENT_SUPPORTS_OPENXR)
     dynamic_cast<VulkanOpenxrPlatform*>(this->mPlatform)->GetActiveSession()->AsyncXrEndFrame();
-}
-
+#else
+    PANIC_LOG("OpenXR support is not enabled.")
 #endif
+}
 
 void VulkanDriver::flush(int) {
     FVK_SYSTRACE_CONTEXT();
