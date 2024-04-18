@@ -152,11 +152,9 @@ DECL_DRIVER_API_N(setPresentationTime,
 DECL_DRIVER_API_N(endFrame,
         uint32_t, frameId)
 
-#if defined(FILAMENT_SUPPORTS_OPENXR)
 DECL_DRIVER_API_0(xrBeginFrame)
 
 DECL_DRIVER_API_0(xrEndFrame)
-#endif
 
 // hint to the driver that we're done with all render targets up to this point. i.e. the driver
 // can start rendering. e.g. correspond to glFlush() for a GLES driver.
