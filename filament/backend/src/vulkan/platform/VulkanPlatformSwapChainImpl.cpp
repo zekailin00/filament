@@ -352,7 +352,7 @@ VulkanPlatformOpenxrSwapChain::VulkanPlatformOpenxrSwapChain(
     VulkanPlatformSwapChainImpl(context, device, queue),
     mSession(session), mEye(session->GetSwapchainIndex())
 {
-    if (!SelectImageFormat(VK_FORMAT_B8G8R8A8_UNORM)) {
+    if (!SelectImageFormat(VK_FORMAT_B8G8R8A8_SRGB)) {
         utils::slog.e << "[OpenXR] Unable to Get image format"
             << utils::io::endl;
         throw;
@@ -396,7 +396,8 @@ VulkanPlatformOpenxrSwapChain::VulkanPlatformOpenxrSwapChain(
     mSwapChainBundle.depth = createImage(mSwapChainBundle.extent, mSwapChainBundle.depthFormat);
 
     assert(count == mSwapChainBundle.colors.size());
-    utils::slog.i << "[Openxr] Swapchains created with total image count: "
+    utils::slog.i << "[Openxr] Swapchains [" << mEye
+        << "] created with total image count: " 
         << std::to_string(mSwapChainBundle.colors.size())
         << utils::io::endl;
 }

@@ -281,6 +281,10 @@ if (FILAMENT_ENABLE_FEATURE_LEVEL_0)
     add_definitions(-DFILAMENT_ENABLE_FEATURE_LEVEL_0)
 endif()
 
+if (FILAMENT_SUPPORTS_VULKAN AND FILAMENT_SUPPORTS_OPENXR)
+        add_definitions(-DFILAMENT_SUPPORTS_OPENXR=1)
+endif ()
+
 # ==================================================================================================
 # Definitions
 # ==================================================================================================

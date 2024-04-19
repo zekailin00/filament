@@ -188,7 +188,10 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
             view->getView()->setScene(mScene);
         }
     }
-
+#if defined(FILAMENT_SUPPORTS_OPENXR)
+        window->mXrViews[0]->getView()->setScene(mScene);
+        window->mXrViews[1]->getView()->setScene(mScene);
+#endif
     setupCallback(mEngine, window->mMainView->getView(), mScene);
 
     if (imguiCallback) {
@@ -470,7 +473,30 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
 
         } else {
             ++mSkippedFrames;
+            printf("skipped frame: %d\n", mSkippedFrames);
         }
+
+#if defined(FILAMENT_SUPPORTS_OPENXR)
+        mVulkanPlatform->PollEvents();
+
+        mOpenxrSession->XrBeginFrame();
+
+        
+
+        if(renderer->beginFrame(window->mXrSwapchains[0]))
+        {
+            renderer->render(window->mXrViews[0]->getView());
+            renderer->endFrame();
+        }
+
+        if(renderer->beginFrame(window->mXrSwapchains[1]))
+        {
+            renderer->render(window->mXrViews[1]->getView());
+            renderer->endFrame();
+        }
+
+        mOpenxrSession->XrEndFrame();
+#endif
     }
 
     if (mImGuiHelper) {
@@ -643,11 +669,6 @@ FilamentApp::Window::Window(FilamentApp* filamentApp,
         // For single-threaded platforms, we need to ensure that Filament's OpenGL context is
         // current, rather than the one created by SDL.
         mFilamentApp->mEngine = createEngine();
-#if defined(FILAMENT_SUPPORTS_OPENXR)
-        mFilamentApp->mOpenxrSession = dynamic_cast<VulkanOpenxrPlatform*>(
-            mFilamentApp->mVulkanPlatform)->CreateSession();
-        assert(mFilamentApp->mOpenxrSession);
-#endif
         // get the resolved backend
         mBackend = config.backend = mFilamentApp->mEngine->getBackend();
 
@@ -677,6 +698,17 @@ FilamentApp::Window::Window(FilamentApp* filamentApp,
 
         mSwapChain = mFilamentApp->mEngine->createSwapChain(
                 nativeSwapChain, filament::SwapChain::CONFIG_HAS_STENCIL_BUFFER);
+
+#if defined(FILAMENT_SUPPORTS_OPENXR)
+        mFilamentApp->mOpenxrSession =
+            mFilamentApp->mVulkanPlatform->CreateSession();
+        assert(mFilamentApp->mOpenxrSession);
+
+        mXrSwapchains[0] = mFilamentApp->mEngine->createSwapChain(
+            mFilamentApp->mOpenxrSession, filament::SwapChain::CONFIG_OPENXR_SESSION);
+        mXrSwapchains[1] = mFilamentApp->mEngine->createSwapChain(
+            mFilamentApp->mOpenxrSession, filament::SwapChain::CONFIG_OPENXR_SESSION);
+#endif
     }
     mRenderer = mFilamentApp->mEngine->createRenderer();
 
@@ -726,6 +758,17 @@ FilamentApp::Window::Window(FilamentApp* filamentApp,
         // Ortho view obviously uses an ortho camera
         mOrthoView->setCamera( (Camera *)mMainView->getView()->getDirectionalLightCamera() );
     }
+
+#if defined(FILAMENT_SUPPORTS_OPENXR)
+    em.create(2, mXrCameraEntities);
+    mXrCameras[0] = mFilamentApp->mEngine->createCamera(mXrCameraEntities[3]);
+    mXrCameras[1] = mFilamentApp->mEngine->createCamera(mXrCameraEntities[4]);
+
+    mXrViews[0] = new CView(*mRenderer, "XR view 0");
+    mXrViews[1] = new CView(*mRenderer, "XR view 1");
+    mXrViews[0]->setCamera(mXrCameras[0]);
+    mXrViews[1]->setCamera(mXrCameras[1]);
+#endif
 
     // configure the cameras
     configureCamerasForWindow();

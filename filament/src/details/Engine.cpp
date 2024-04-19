@@ -55,6 +55,10 @@
 
 #include "generated/resources/materials.h"
 
+#if defined(FILAMENT_SUPPORTS_OPENXR)
+#include <backend\platforms\VulkanOpenxrPlatform.h>
+#endif
+
 using namespace filament::math;
 using namespace utils;
 
@@ -243,6 +247,10 @@ void FEngine::init() {
     ::new(&mDriverApiStorage) DriverApi(*mDriver, mCommandBufferQueue.getCircularBuffer());
 
     DriverApi& driverApi = getDriverApi();
+
+#if defined(FILAMENT_SUPPORTS_OPENXR)
+    dynamic_cast<VulkanOpenxrPlatform*>(mPlatform)->driverApi = &driverApi;
+#endif
 
     mActiveFeatureLevel = std::min(mActiveFeatureLevel, driverApi.getFeatureLevel());
 

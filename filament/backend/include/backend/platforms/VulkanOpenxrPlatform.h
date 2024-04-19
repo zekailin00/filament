@@ -6,6 +6,10 @@
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 
+#include <filament/Engine.h>
+#include "private\backend\CommandStream.h"
+
+class filament::FEngine; // sets command stream
 namespace filament::backend {
 
 
@@ -80,6 +84,8 @@ private:
     OpenxrSession* activeSession = nullptr;
 
     friend OpenxrSession;
+    friend filament::FEngine;
+    CommandStream* driverApi = nullptr;
 
     //--------- Actions ----------//
     XrAction lSqueezeValueAction, rSqueezeValueAction;
@@ -131,7 +137,7 @@ private:
     void InitializeSession();
     void InitializeSpaces();
 
-    void Initialize(VulkanOpenxrPlatform* platform);
+    void Initialize(VulkanOpenxrPlatform* platform, CommandStream* driverApi);
     void Destroy();
 
 private: // VulkanPlatformOpenxrSwapChain
@@ -142,6 +148,7 @@ private: // VulkanPlatformOpenxrSwapChain
 private:    
     friend VulkanOpenxrPlatform;
     VulkanOpenxrPlatform* platform = nullptr;
+    CommandStream* driverApi = nullptr; // Owned by FEngine
 
     XrSession xrSession = XR_NULL_HANDLE;
     XrSessionState sessionState = XR_SESSION_STATE_UNKNOWN;

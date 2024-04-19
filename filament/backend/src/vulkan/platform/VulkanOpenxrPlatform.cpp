@@ -27,8 +27,10 @@
 
 #define CREATE_ACTION(actName, actType) do {                            \
     XrActionCreateInfo actioninfo{XR_TYPE_ACTION_CREATE_INFO};          \
-    utility::strcpy_s(actioninfo.actionName, #actName);                 \
-    utility::strcpy_s(actioninfo.localizedActionName, #actName);        \
+    std::string str = #actName;                                         \
+    std::transform(str.begin(), str.end(), str.begin(), ::tolower);     \
+    utility::strcpy_s(actioninfo.actionName, str.c_str());              \
+    utility::strcpy_s(actioninfo.localizedActionName, str.c_str());     \
     actioninfo.actionType = XR_ACTION_TYPE_##actType##_INPUT;           \
     CHK_XRCMD(xrCreateAction(inputActionSet, &actioninfo, &actName));   \
 } while(0)
@@ -172,7 +174,7 @@ OpenxrSession* VulkanOpenxrPlatform::CreateSession()
     assert(activeSession == nullptr);
 
     activeSession = new OpenxrSession();
-    activeSession->Initialize(this);
+    activeSession->Initialize(this, driverApi);
 
     return activeSession;
 }
@@ -454,8 +456,8 @@ SwapChainPtr VulkanOpenxrPlatform::createSwapChain(void* nativeWindow,
         VulkanPlatformOpenxrSwapChain* swapchain = new VulkanPlatformOpenxrSwapChain(
                 mImpl->mContext, mImpl->mDevice, mImpl->mGraphicsQueue,
                 session, extent, sampleCount, flags);
-        assert(mImpl->mOpenxrSwapchain == nullptr);
-        mImpl->mOpenxrSwapchain = swapchain;
+        mImpl->mOpenxrSwapchains.insert(swapchain);
+        assert(mImpl->mOpenxrSwapchains.size() <= 2);
         return swapchain;
     } else {
         return VulkanPlatform::createSwapChain(nativeWindow, flags, extent);
@@ -464,7 +466,7 @@ SwapChainPtr VulkanOpenxrPlatform::createSwapChain(void* nativeWindow,
 
 VulkanPlatform::SwapChainBundle VulkanOpenxrPlatform::getSwapChainBundle(SwapChainPtr handle) {
     SYSTRACE_CALL();
-    if (mImpl->mOpenxrSwapchain == handle) {
+    if (mImpl->mOpenxrSwapchains.find(handle) != mImpl->mOpenxrSwapchains.end()) {
         return static_cast<VulkanPlatformOpenxrSwapChain*>(handle)->getSwapChainBundle();
     } else {
         return VulkanPlatform::getSwapChainBundle(handle);
@@ -473,7 +475,7 @@ VulkanPlatform::SwapChainBundle VulkanOpenxrPlatform::getSwapChainBundle(SwapCha
 
 VkResult VulkanOpenxrPlatform::acquire(SwapChainPtr handle, VkSemaphore clientSignal, uint32_t* index) {
     SYSTRACE_CALL();
-    if (mImpl->mOpenxrSwapchain == handle) {
+    if (mImpl->mOpenxrSwapchains.find(handle) != mImpl->mOpenxrSwapchains.end()) {
         return static_cast<VulkanPlatformOpenxrSwapChain*>(handle)
             ->acquire(clientSignal, index);
     } else {
@@ -484,7 +486,7 @@ VkResult VulkanOpenxrPlatform::acquire(SwapChainPtr handle, VkSemaphore clientSi
 VkResult VulkanOpenxrPlatform::present(SwapChainPtr handle, uint32_t index,
         VkSemaphore finishedDrawing) {
     SYSTRACE_CALL();
-    if (mImpl->mOpenxrSwapchain == handle) {
+    if (mImpl->mOpenxrSwapchains.find(handle) != mImpl->mOpenxrSwapchains.end()) {
         return static_cast<VulkanPlatformOpenxrSwapChain*>(handle)
             ->present(index, finishedDrawing);
     } else {
@@ -494,7 +496,7 @@ VkResult VulkanOpenxrPlatform::present(SwapChainPtr handle, uint32_t index,
 
 bool VulkanOpenxrPlatform::hasResized(SwapChainPtr handle) {
     SYSTRACE_CALL();
-    if (mImpl->mOpenxrSwapchain == handle) {
+    if (mImpl->mOpenxrSwapchains.find(handle) != mImpl->mOpenxrSwapchains.end()) {
         return static_cast<VulkanPlatformOpenxrSwapChain*>(handle)->hasResized();
     } else {
         return VulkanPlatform::hasResized(handle);
@@ -503,7 +505,7 @@ bool VulkanOpenxrPlatform::hasResized(SwapChainPtr handle) {
 
 VkResult VulkanOpenxrPlatform::recreate(SwapChainPtr handle) {
     SYSTRACE_CALL();
-    if (mImpl->mOpenxrSwapchain == handle) {
+    if (mImpl->mOpenxrSwapchains.find(handle) != mImpl->mOpenxrSwapchains.end()) {
         return static_cast<VulkanPlatformOpenxrSwapChain*>(handle)->recreate();
     } else {
         return VulkanPlatform::recreate(handle);
@@ -512,9 +514,8 @@ VkResult VulkanOpenxrPlatform::recreate(SwapChainPtr handle) {
 
 void VulkanOpenxrPlatform::destroy(SwapChainPtr handle) {
     SYSTRACE_CALL();
-    if (mImpl->mOpenxrSwapchain) {
-        delete static_cast<VulkanPlatformOpenxrSwapChain*>(handle);
-        mImpl->mOpenxrSwapchain = nullptr;
+    if (mImpl->mOpenxrSwapchains.erase(handle)) {
+        delete static_cast<VulkanPlatformOpenxrSwapChain*>(handle);;
     } else {
         VulkanPlatform::destroy(handle);
     }
@@ -527,12 +528,12 @@ void OpenxrSession::PollActions()
 
 void OpenxrSession::XrBeginFrame()
 {
-    platform->mDriver->xrBeginFrame(0);
+    driverApi->xrBeginFrame(0);
 }
 
 void OpenxrSession::XrEndFrame()
 {
-    platform->mDriver->xrEndFrame(0);
+    driverApi->xrEndFrame(0);
 }
 
 void OpenxrSession::AsyncXrBeginFrame()
@@ -704,11 +705,12 @@ void OpenxrSession::AsyncXrEndFrame()
     }
 }
 
-void OpenxrSession::Initialize(VulkanOpenxrPlatform* platform)
+void OpenxrSession::Initialize(VulkanOpenxrPlatform* platform, CommandStream* driverApi)
 {
     SYSTRACE_NAME("OpenxrSession::Initialize");
 
     this->platform = platform;
+    this->driverApi = driverApi;
     InitializeSession();
     InitializeSpaces();
     // Initialize actions?
