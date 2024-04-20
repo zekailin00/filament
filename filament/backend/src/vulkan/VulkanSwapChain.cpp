@@ -102,14 +102,19 @@ void VulkanSwapChain::present() {
                 .baseArrayLayer = 0,
                 .layerCount = 1,
         };
-        mColors[mCurrentSwapIndex]->transitionLayout(cmdbuf, subresources, VulkanLayout::PRESENT);
+        if (mOpenxr)
+            mColors[mCurrentSwapIndex]->transitionLayout(cmdbuf, subresources, VulkanLayout::COLOR_ATTACHMENT_RESOLVE);
+        else
+            mColors[mCurrentSwapIndex]->transitionLayout(cmdbuf, subresources, VulkanLayout::PRESENT);
     }
     mCommands->flush();
 
     // We only present if it is not headless.  No-op for headless (but note that we still need the
     // flush() in the above line).
     if (!mHeadless) {
-        VkSemaphore const finishedDrawing = mCommands->acquireFinishedSignal();
+        VkSemaphore finishedDrawing = VK_NULL_HANDLE;
+        if (!mOpenxr)
+            finishedDrawing = mCommands->acquireFinishedSignal();
         VkResult const result = mPlatform->present(swapChain, mCurrentSwapIndex, finishedDrawing);
         ASSERT_POSTCONDITION(result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR ||
                                      result == VK_ERROR_OUT_OF_DATE_KHR,

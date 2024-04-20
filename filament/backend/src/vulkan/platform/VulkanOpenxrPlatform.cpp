@@ -184,6 +184,7 @@ void VulkanOpenxrPlatform::DestroySession(OpenxrSession*& openxrSession)
     SYSTRACE_CALL();
     assert(activeSession != nullptr);
     
+    openxrSession->Wait();
     openxrSession->Destroy();
     delete openxrSession;
     openxrSession = nullptr;
@@ -253,6 +254,9 @@ void VulkanOpenxrPlatform::LoadViewConfig()
     CHK_XRCMD(xrEnumerateViewConfigurationViews(
         xrInstance, xrSystemId, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
         count, &count, viewConfigViewList.data()));
+    
+    extent.width = viewConfigViewList[0].recommendedImageRectWidth;
+    extent.height = viewConfigViewList[0].recommendedImageRectHeight;
 
     utils::slog.i << "[OpenXR] Number of views: " 
         << std::to_string(viewConfigViewList.size())
@@ -535,25 +539,33 @@ void OpenxrSession::PollActions()
 bool OpenxrSession::XrBeginFrame()
 {
     SYSTRACE_CALL();
-    if (sessionState == XR_SESSION_STATE_READY ||
-        sessionState == XR_SESSION_STATE_SYNCHRONIZED ||
-        sessionState == XR_SESSION_STATE_VISIBLE ||
-        sessionState == XR_SESSION_STATE_FOCUSED) {
-        
-        XrResult result;
-        XrFramePacer::State& state = pacer.NewState();
+#if FVK_ENABLED(FVK_DEBUG_OPENXR)
+        std::string report = "[XrSession] BeginSyncFrame: " + std::to_string(syncBeginID++);
+        SYSTRACE_TEXT(report.c_str());
+        utils::slog.i << report << utils::io::endl;
+#endif
+
+    XrResult result = XR_SUCCESS;
+    XrFramePacer::State state = XrFramePacer::State();
+    {   // State cannot change between session state check and API call
+        std::shared_lock lock(stateNotModified);
+        if (!IsRunningSession())
+            return false;
 
         // Wait for a new frame.
         XrFrameWaitInfo frameWaitInfo {XR_TYPE_FRAME_WAIT_INFO};
         state.frameState = {XR_TYPE_FRAME_STATE};
         CHK_XRCMD2(result = xrWaitFrame(xrSession, &frameWaitInfo, &state.frameState));
+    }
 
-        if (result == XR_SESSION_LOSS_PENDING)
-        {
-            SetSessionState(XR_SESSION_STATE_LOSS_PENDING);
-            return false;
-        }
-
+    if (result == XR_SESSION_LOSS_PENDING)
+    {
+        SetSessionState(XR_SESSION_STATE_LOSS_PENDING);
+        return false;
+    }
+    else
+    {
+        
         {   // Locate eyes
             XrViewLocateInfo locateInfo {XR_TYPE_VIEW_LOCATE_INFO};
             locateInfo.viewConfigurationType = 
@@ -652,35 +664,29 @@ bool OpenxrSession::XrBeginFrame()
             //     EventQueue::InputXR, eventRightGripPose);
         }
 
-#if FVK_ENABLED(FVK_DEBUG_OPENXR)
-        std::string report = "[XrSession] BeginSyncFrame: " + std::to_string(syncBeginID++);
-        SYSTRACE_TEXT(report.c_str());
-        utils::slog.i << report << utils::io::endl;
-#endif
-
+        pacer.AddNewState(state);
         driverApi->xrBeginFrame(0);
         return true;
     }
 
-    return false;
 }
 
 void OpenxrSession::XrEndFrame()
 {
     SYSTRACE_CALL();
-    if (sessionState == XR_SESSION_STATE_READY ||
-        sessionState == XR_SESSION_STATE_SYNCHRONIZED ||
-        sessionState == XR_SESSION_STATE_VISIBLE ||
-        sessionState == XR_SESSION_STATE_FOCUSED)
-    {
-        driverApi->xrEndFrame(0);
-
 #if FVK_ENABLED(FVK_DEBUG_OPENXR)
         std::string report = "[XrSession] EndSyncFrame: " + std::to_string(syncEndID++);
         SYSTRACE_TEXT(report.c_str());
         utils::slog.i << report << utils::io::endl;
+    //TODO: debug that XrBeginFrame is called
 #endif
-    }
+
+    /*
+     * Only and must be called when XrBeginFrame returns true,
+     * so a new frame state enqueued by XrBegineFrame can be
+     * dequeued asynchronously by AsyncXrEndFrame
+     */
+    driverApi->xrEndFrame(0);
 }
 
 void OpenxrSession::AsyncXrBeginFrame()
@@ -692,60 +698,59 @@ void OpenxrSession::AsyncXrBeginFrame()
     utils::slog.i << report << utils::io::endl;
 #endif
 
-    XrResult result;
-    XrFrameBeginInfo frameBeginInfo {XR_TYPE_FRAME_BEGIN_INFO};
-    CHK_XRCMD2(result = xrBeginFrame(xrSession, &frameBeginInfo));
+    XrResult result = XR_SUCCESS;
+    {   // State cannot change between session state check and API call
+        std::shared_lock lock(stateNotModified);
+        if (!IsRunningSession())
+            return;
 
-    if (result == XR_SESSION_LOSS_PENDING) {
-        SetSessionState(XR_SESSION_STATE_LOSS_PENDING);
-        return;
+        XrFrameBeginInfo frameBeginInfo {XR_TYPE_FRAME_BEGIN_INFO};
+        CHK_XRCMD2(result = xrBeginFrame(xrSession, &frameBeginInfo));
     }
+
+    if (result == XR_SESSION_LOSS_PENDING)
+        SetSessionState(XR_SESSION_STATE_LOSS_PENDING);
 }
 
 void OpenxrSession::AsyncXrEndFrame()
 {
     SYSTRACE_CALL();
 #if FVK_ENABLED(FVK_DEBUG_OPENXR)
-    std::string report = "[XrSession] endAsync: " + std::to_string(asyncEndID++);
+    std::string report = "[XrSession] EndAsyncFrame: " + std::to_string(asyncEndID++);
     SYSTRACE_TEXT(report.c_str());
     utils::slog.i << report << utils::io::endl;
 #endif
 
-    if (!(sessionState == XR_SESSION_STATE_READY ||
-        sessionState == XR_SESSION_STATE_SYNCHRONIZED ||
-        sessionState == XR_SESSION_STATE_VISIBLE ||
-        sessionState == XR_SESSION_STATE_FOCUSED)) {
-        return;
+    XrResult result = XR_SUCCESS;
+    XrFramePacer::State state = pacer.GetLastState();
+    pacer.PopLastState();
+    {   // State cannot change between session state check and API call
+        std::shared_lock lock(stateNotModified);
+        if (!IsRunningSession())
+            return;
+
+        XrCompositionLayerProjection layer;
+        layer.type = XR_TYPE_COMPOSITION_LAYER_PROJECTION;
+        layer.next = 0;
+        layer.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
+        layer.space = localSpace;
+        layer.viewCount = 2;
+        layer.views = state.layerViews;
+
+        const XrCompositionLayerBaseHeader* pLayer =
+            reinterpret_cast<XrCompositionLayerBaseHeader*>(&layer);
+
+        XrFrameEndInfo frameEndInfo {XR_TYPE_FRAME_END_INFO};
+        frameEndInfo.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+        frameEndInfo.displayTime = state.frameState.predictedDisplayTime;
+        frameEndInfo.layerCount = 1;
+        frameEndInfo.layers = &pLayer;
+        
+        CHK_XRCMD2(result = xrEndFrame(xrSession, &frameEndInfo));
     }
-
-    XrResult result;
-    XrFramePacer::State& state = pacer.GetLastState();
-
-    XrCompositionLayerProjection layer;
-    layer.type = XR_TYPE_COMPOSITION_LAYER_PROJECTION;
-    layer.next = 0;
-    layer.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
-    layer.space = localSpace;
-    layer.viewCount = 2;
-    layer.views = state.layerViews;
-
-    const XrCompositionLayerBaseHeader* pLayer =
-        reinterpret_cast<XrCompositionLayerBaseHeader*>(&layer);
-
-    XrFrameEndInfo frameEndInfo {XR_TYPE_FRAME_END_INFO};
-    frameEndInfo.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
-    frameEndInfo.displayTime = state.frameState.predictedDisplayTime;
-    frameEndInfo.layerCount = 1;
-    frameEndInfo.layers = &pLayer;
     
-    CHK_XRCMD2(result = xrEndFrame(xrSession, &frameEndInfo));
-    pacer.ReleaseLastState();
-
     if (result == XR_SESSION_LOSS_PENDING)
-    {
         SetSessionState(XR_SESSION_STATE_LOSS_PENDING);
-        return;
-    }
 }
 
 void OpenxrSession::Initialize(VulkanOpenxrPlatform* platform, CommandStream* driverApi)
@@ -786,6 +791,8 @@ void OpenxrSession::Destroy()
 void OpenxrSession::InitializeSession()
 {
     SYSTRACE_CALL();
+    // Excludes all methods that read session state
+    std::unique_lock lock(stateNotModified);
 
     XrGraphicsBindingVulkanKHR vkBinding{XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR};
     vkBinding.instance = platform->mImpl->mInstance;
@@ -886,14 +893,19 @@ void OpenxrSession::InitializeSpaces()
 bool OpenxrSession::ShouldCloseSession()
 {
     SYSTRACE_CALL();
-    
-    if (sessionState == XR_SESSION_STATE_EXITING ||
-        sessionState == XR_SESSION_STATE_LOSS_PENDING)
-    {
-        return true;
-    }
+    std::shared_lock lock(stateNotModified);
+    return (sessionState == XR_SESSION_STATE_EXITING ||
+        sessionState == XR_SESSION_STATE_LOSS_PENDING);
+}
 
-    return false;
+bool OpenxrSession::IsRunningSession()
+{
+    SYSTRACE_CALL();
+    std::shared_lock lock(stateNotModified);
+    return (sessionState == XR_SESSION_STATE_READY ||
+        sessionState == XR_SESSION_STATE_SYNCHRONIZED ||
+        sessionState == XR_SESSION_STATE_VISIBLE ||
+        sessionState == XR_SESSION_STATE_FOCUSED);
 }
 
 void OpenxrSession::RequestCloseSession()
@@ -905,6 +917,8 @@ void OpenxrSession::RequestCloseSession()
 void OpenxrSession::SetSessionState(XrSessionState newState)
 {
     SYSTRACE_CALL();
+    // Excludes all methods that read session state
+    std::unique_lock lock(stateNotModified);
 
     static const std::vector<std::string> stateNames
     {
@@ -939,7 +953,6 @@ void OpenxrSession::SetSessionState(XrSessionState newState)
         case XR_SESSION_STATE_STOPPING:
         {
             CHK_XRCMD2(xrEndSession(xrSession));
-            pacer.Reset();
             break;
         }
         case XR_SESSION_STATE_EXITING:

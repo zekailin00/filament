@@ -7,11 +7,15 @@
 #include <openxr/openxr_platform.h>
 
 #include <filament/Engine.h>
+#include <atomic>
+#include <shared_mutex>
 #include "private\backend\CommandStream.h"
 
-class filament::FEngine; // sets command stream
-namespace filament::backend {
 
+namespace filament {
+class FEngine; // sets command stream
+
+namespace backend {
 
 class OpenxrSession;
 struct VulkanPlatformOpenxrSwapChain;
@@ -77,6 +81,7 @@ private:
     ExtensionSet vulkanInstanceExt{};
     std::vector<char> vulkanDeviceExtStr;
     ExtensionSet vulkanDeviceExt{};
+    VkExtent2D extent;
 
     XrInstance xrInstance = XR_NULL_HANDLE;
     XrSystemId xrSystemId = XR_NULL_SYSTEM_ID;
@@ -84,7 +89,7 @@ private:
     OpenxrSession* activeSession = nullptr;
 
     friend OpenxrSession;
-    friend filament::FEngine;
+    friend FEngine;
     CommandStream* driverApi = nullptr;
 
     //--------- Actions ----------//
@@ -117,14 +122,13 @@ public:
             XrCompositionLayerProjectionView layerViews[2]; 
             XrView views[2];
         };
-        State& NewState() {
-            frameStates.push_front(State());
-            return frameStates.front();
-        }
-        State& GetLastState() {
-            return frameStates.back();
-        }
-        void ReleaseLastState() {
+
+        int NumFrameQueued()            {return frameStates.size();}
+        State& GetCurrState()           {return frameStates.front();}
+        State& GetLastState()           {return frameStates.back();}
+        void AddNewState(State& state)  {frameStates.push_front(state);}
+        void PopLastState() {
+            assert(!frameStates.empty());
             frameStates.pop_back();
         }
         int GetEyeIndex() {
@@ -152,10 +156,13 @@ public:
 public:
     void SetSessionState(XrSessionState newState);
     bool ShouldCloseSession();
+    bool IsRunningSession();
     void RequestCloseSession();
 
-    // CreateSwapchain
     void PollActions();
+    XrView* GetViews() {return pacer.GetCurrState().views;}
+    VkExtent2D GetExtent() {return platform->extent;}
+
     bool XrBeginFrame();
     void XrEndFrame();
     void AsyncXrBeginFrame();
@@ -179,6 +186,11 @@ private:
     void InitializeSpaces();
 
     void Initialize(VulkanOpenxrPlatform* platform, CommandStream* driverApi);
+    void Wait() {
+        while (pacer.NumFrameQueued() != 0)
+            /* wait until CMD thread flushes all frames*/;
+        return;
+    }
     void Destroy();
 
 private: // VulkanPlatformOpenxrSwapChain
@@ -192,8 +204,9 @@ private:
     CommandStream* driverApi = nullptr; // Owned by FEngine
 
     XrSession xrSession = XR_NULL_HANDLE;
-    XrSessionState sessionState = XR_SESSION_STATE_UNKNOWN;
     XrFramePacer pacer;
+    std::atomic<XrSessionState> sessionState = XR_SESSION_STATE_UNKNOWN;
+    mutable std::shared_mutex stateNotModified;
 
     XrSpace viewSpace = VK_NULL_HANDLE;
     XrSpace localSpace = VK_NULL_HANDLE;
@@ -212,5 +225,7 @@ private:
 };
 
 }// namespace filament::backend
+
+}// namspace filament
 
 #endif TNT_FILAMENT_BACKEND_PLATFORMS_VULKANOPENXRPLATFORM_H

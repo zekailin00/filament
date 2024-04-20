@@ -230,8 +230,9 @@ private:
         std::unordered_map<SDL_Scancode, CView*> mKeyEventTarget;
 
 #if defined(FILAMENT_SUPPORTS_OPENXR)
-        utils::Entity mXrCameraEntities[2];
+        filament::backend::OpenxrSession* mOpenxrSession = nullptr;
         filament::SwapChain* mXrSwapchains[2] = {nullptr};
+        utils::Entity mXrCameraEntities[2];
         filament::Camera* mXrCameras[2];
         CView* mXrViews[2];
 #endif
@@ -269,7 +270,6 @@ private:
 
 #if defined(FILAMENT_SUPPORTS_OPENXR)
     filament::backend::VulkanOpenxrPlatform* mVulkanPlatform = nullptr;
-    filament::backend::OpenxrSession* mOpenxrSession = nullptr;
 #elif defined(FILAMENT_DRIVER_SUPPORTS_VULKAN)
     filament::backend::VulkanPlatform* mVulkanPlatform = nullptr;
 #endif

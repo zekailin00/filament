@@ -226,8 +226,6 @@ bool FRenderer::beginFrame(FSwapChain* swapChain, uint64_t vsyncSteadyClockTimeN
     mFrameId++;
     mViewRenderedCount = 0;
 
-    SYSTRACE_FRAME_ID(mFrameId);
-
     FEngine& engine = mEngine;
     FEngine::DriverApi& driver = engine.getDriverApi();
 
@@ -299,6 +297,8 @@ bool FRenderer::beginFrame(FSwapChain* swapChain, uint64_t vsyncSteadyClockTimeN
 void FRenderer::endFrame() {
     SYSTRACE_CALL();
 
+    SYSTRACE_FRAME_ID(mFrameId);
+
     if (UTILS_UNLIKELY(mBeginFrameInternal)) {
         mBeginFrameInternal();
         mBeginFrameInternal = {};
@@ -313,13 +313,13 @@ void FRenderer::endFrame() {
         driver.debugThreading();
     }
 
+    mFrameInfoManager.endFrame(driver);
+    mFrameSkipper.endFrame(driver);
+
     if (mSwapChain) {
         mSwapChain->commit(driver);
         mSwapChain = nullptr;
     }
-
-    mFrameInfoManager.endFrame(driver);
-    mFrameSkipper.endFrame(driver);
 
     driver.endFrame(mFrameId);
 
