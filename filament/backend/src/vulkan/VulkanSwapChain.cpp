@@ -35,6 +35,7 @@ VulkanSwapChain::VulkanSwapChain(VulkanPlatform* platform, VulkanContext const& 
       mAllocator(allocator),
       mStagePool(stagePool),
       mHeadless(extent.width != 0 && extent.height != 0 && !nativeWindow),
+      mOpenxr(flags & backend::SWAP_CHAIN_CONFIG_OPENXR_SESSION),
       mFlushAndWaitOnResize(platform->getCustomization().flushAndWaitOnWindowResize),
       mImageReady(VK_NULL_HANDLE),
       mAcquired(false),
@@ -48,7 +49,7 @@ VulkanSwapChain::VulkanSwapChain(VulkanPlatform* platform, VulkanContext const& 
     };
 
     // No need to wait on this semaphore before drawing when in Headless mode.
-    if (!mHeadless) {
+    if (!mHeadless && !mOpenxr) {
         VkResult result =
                 vkCreateSemaphore(mPlatform->getDevice(), &createInfo, nullptr, &mImageReady);
         ASSERT_POSTCONDITION(result == VK_SUCCESS, "Failed to create semaphore");

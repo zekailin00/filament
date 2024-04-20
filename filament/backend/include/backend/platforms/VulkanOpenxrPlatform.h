@@ -1,7 +1,7 @@
 #ifndef TNT_FILAMENT_BACKEND_PLATFORMS_VULKANOPENXRPLATFORM_H
 #define TNT_FILAMENT_BACKEND_PLATFORMS_VULKANOPENXRPLATFORM_H
 
-#include "backend/platforms/VulkanPlatform.h"
+#include <backend/platforms/VulkanPlatform.h>
 #define XR_USE_GRAPHICS_API_VULKAN
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
@@ -109,13 +109,54 @@ private:
 class OpenxrSession
 {
 public:
+    class XrFramePacer
+    {
+    public:
+        struct State {
+            XrFrameState frameState{XR_TYPE_FRAME_STATE};
+            XrCompositionLayerProjectionView layerViews[2]; 
+            XrView views[2];
+        };
+        State& NewState() {
+            frameStates.push_front(State());
+            return frameStates.front();
+        }
+        State& GetLastState() {
+            return frameStates.back();
+        }
+        void ReleaseLastState() {
+            frameStates.pop_back();
+        }
+        int GetEyeIndex() {
+            assert(eyeCreated < 2);
+            return eyeCreated++;
+        }
+        void Reset() {
+            eyeCreated = 0;
+            frameStates.clear();
+        }
+    private:
+        // Render loop context
+        // reset when enter XR_SESSION_STATE_READY
+        // index 0 = left eye, index 1 = right eye
+        int eyeCreated = 0;
+        std::list<State> frameStates{};
+
+        /* Synchronization is done by the OpenXR runtime internally
+         * through the calls of xrBeginFrame and xrWaitFrame
+         * Spec: "A subsequent xrWaitFrame call must block until
+         * the previous frame has been begun with xrBeginFrame"
+        */
+    };
+
+public:
     void SetSessionState(XrSessionState newState);
     bool ShouldCloseSession();
     void RequestCloseSession();
 
     // CreateSwapchain
     void PollActions();
-    void XrBeginFrame();
+    bool XrBeginFrame();
     void XrEndFrame();
     void AsyncXrBeginFrame();
     void AsyncXrEndFrame();
@@ -142,7 +183,7 @@ private:
 
 private: // VulkanPlatformOpenxrSwapChain
     friend VulkanPlatformOpenxrSwapChain;
-    int GetSwapchainIndex() {return eyeCreated++;} //FIXME: view index ???
+    int GetSwapchainIndex() {return pacer.GetEyeIndex();}
     XrInstance GetXrInstance() {return platform->xrInstance;}
 
 private:    
@@ -152,7 +193,7 @@ private:
 
     XrSession xrSession = XR_NULL_HANDLE;
     XrSessionState sessionState = XR_SESSION_STATE_UNKNOWN;
-
+    XrFramePacer pacer;
 
     XrSpace viewSpace = VK_NULL_HANDLE;
     XrSpace localSpace = VK_NULL_HANDLE;
@@ -163,14 +204,11 @@ private:
     XrSpace lAimPoseSpace = VK_NULL_HANDLE;
     XrSpace rAimPoseSpace = VK_NULL_HANDLE;
 
-
-    // Render loop context
-    // reset when enter XR_SESSION_STATE_READY
-    // index 0 = left eye, index 1 = right eye
-    XrFrameState frameState{};
-    XrCompositionLayerProjectionView layerViews[2]; 
-    XrView views[2];
-    int eyeCreated = 0;
+    // Debug
+    int syncBeginID = 0;
+    int syncEndID = 0;
+    int asyncBeginID = 0;
+    int asyncEndID = 0;
 };
 
 }// namespace filament::backend

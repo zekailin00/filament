@@ -419,14 +419,15 @@ VkResult VulkanPlatformOpenxrSwapChain::acquire(VkSemaphore clientSignal, uint32
     waitInfo.timeout = XR_INFINITE_DURATION;
     CHK_XRCMD(xrWaitSwapchainImage(mSwapchain, &waitInfo));
 
-    mSession->layerViews[mEye].type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW;
-    mSession->layerViews[mEye].next = 0;
-    mSession->layerViews[mEye].pose = mSession->views[mEye].pose;
-    mSession->layerViews[mEye].fov = mSession->views[mEye].fov;
-    mSession->layerViews[mEye].subImage.swapchain = mSwapchain;
-    mSession->layerViews[mEye].subImage.imageArrayIndex = 0;
-    mSession->layerViews[mEye].subImage.imageRect.offset = {0, 0};
-    mSession->layerViews[mEye].subImage.imageRect.extent = {
+    OpenxrSession::XrFramePacer::State& state = mSession->pacer.GetLastState();
+    state.layerViews[mEye].type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW;
+    state.layerViews[mEye].next = 0;
+    state.layerViews[mEye].pose = state.views[mEye].pose;
+    state.layerViews[mEye].fov = state.views[mEye].fov;
+    state.layerViews[mEye].subImage.swapchain = mSwapchain;
+    state.layerViews[mEye].subImage.imageArrayIndex = 0;
+    state.layerViews[mEye].subImage.imageRect.offset = {0, 0};
+    state.layerViews[mEye].subImage.imageRect.extent = {
         (int32_t) mSwapChainBundle.extent.width,
         (int32_t) mSwapChainBundle.extent.height
     };

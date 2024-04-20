@@ -30,6 +30,7 @@
 #include <utils/EntityManager.h>
 #include <utils/Panic.h>
 #include <utils/Path.h>
+#include <utils/Systrace.h>
 
 #include <filament/Camera.h>
 #include <filament/Material.h>
@@ -446,7 +447,7 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
         int refreshIntervalMS = (SDL_GetDesktopDisplayMode(
             SDL_GetWindowDisplayIndex(window->mWindow), &Mode) == 0 &&
             Mode.refresh_rate != 0) ? round(1000.0 / Mode.refresh_rate) : 16;
-        SDL_Delay(refreshIntervalMS);
+        // SDL_Delay(refreshIntervalMS);
 
         Renderer* renderer = window->getRenderer();
 
@@ -459,43 +460,44 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
             mReconfigureCameras = false;
         }
 
-        if (renderer->beginFrame(window->getSwapChain())) {
-            for (filament::View* offscreenView : mOffscreenViews) {
-                renderer->render(offscreenView);
-            }
-            for (auto const& view : window->mViews) {
-                renderer->render(view->getView());
-            }
-            if (postRender) {
-                postRender(mEngine, window->mViews[0]->getView(), mScene, renderer);
-            }
-            renderer->endFrame();
+        {
+            SYSTRACE_NAME("Surface_SC_render");
+            if (renderer->beginFrame(window->getSwapChain())) {
+                for (filament::View* offscreenView : mOffscreenViews) {
+                    renderer->render(offscreenView);
+                }
+                for (auto const& view : window->mViews) {
+                    renderer->render(view->getView());
+                }
+                if (postRender) {
+                    postRender(mEngine, window->mViews[0]->getView(), mScene, renderer);
+                }
+                renderer->endFrame();
 
-        } else {
-            ++mSkippedFrames;
-            printf("skipped frame: %d\n", mSkippedFrames);
+            } else {
+                ++mSkippedFrames;
+                printf("skipped 2d window frame: %d\n", mSkippedFrames);
+            }
         }
 
 #if defined(FILAMENT_SUPPORTS_OPENXR)
-        mVulkanPlatform->PollEvents();
-
-        mOpenxrSession->XrBeginFrame();
-
-        
-
-        if(renderer->beginFrame(window->mXrSwapchains[0]))
         {
-            renderer->render(window->mXrViews[0]->getView());
-            renderer->endFrame();
-        }
+            SYSTRACE_NAME("OpenXR_SC_render");
+            mVulkanPlatform->PollEvents();
 
-        if(renderer->beginFrame(window->mXrSwapchains[1]))
-        {
-            renderer->render(window->mXrViews[1]->getView());
-            renderer->endFrame();
-        }
+            if (mOpenxrSession->XrBeginFrame())
+            {
+                renderer->beginFrame(window->mXrSwapchains[0]);
+                renderer->render(window->mXrViews[0]->getView());
+                renderer->endFrame();
 
-        mOpenxrSession->XrEndFrame();
+                renderer->beginFrame(window->mXrSwapchains[1]);
+                renderer->render(window->mXrViews[1]->getView());
+                renderer->endFrame();
+
+                mOpenxrSession->XrEndFrame();
+            }
+        }
 #endif
     }
 

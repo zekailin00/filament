@@ -73,7 +73,7 @@ static void strcpy_s(char* dest, const char* src)
 
 VulkanOpenxrPlatform* VulkanOpenxrPlatform::Initialize()
 {
-    SYSTRACE_NAME("OpenxrPlatform::Initialize");
+    SYSTRACE_CALL();
 
     unsigned int layerCount;
     std::vector<XrApiLayerProperties> layerList;
@@ -170,7 +170,7 @@ VulkanOpenxrPlatform* VulkanOpenxrPlatform::Initialize()
 
 OpenxrSession* VulkanOpenxrPlatform::CreateSession()
 {
-    SYSTRACE_NAME("OpenxrPlatform::CreateSession");
+    SYSTRACE_CALL();
     assert(activeSession == nullptr);
 
     activeSession = new OpenxrSession();
@@ -181,7 +181,7 @@ OpenxrSession* VulkanOpenxrPlatform::CreateSession()
 
 void VulkanOpenxrPlatform::DestroySession(OpenxrSession*& openxrSession)
 {
-    SYSTRACE_NAME("OpenxrPlatform::DestroySession");
+    SYSTRACE_CALL();
     assert(activeSession != nullptr);
     
     openxrSession->Destroy();
@@ -223,6 +223,8 @@ ExtensionSet VulkanOpenxrPlatform::getDeviceExtensions(VkPhysicalDevice device)
 
 void VulkanOpenxrPlatform::LoadViewConfig()
 {
+    SYSTRACE_CALL();
+
     unsigned int count;
     CHK_XRCMD(xrEnumerateViewConfigurations
         (xrInstance, xrSystemId, 0, &count, nullptr));
@@ -265,6 +267,8 @@ void VulkanOpenxrPlatform::LoadViewConfig()
 
 void VulkanOpenxrPlatform::LoadVulkanRequirements()
 {
+    SYSTRACE_CALL();
+
     PFN_xrGetVulkanGraphicsRequirementsKHR xrGetVulkanGraphicsReqKHR;
     CHK_XRCMD(xrGetInstanceProcAddr(
         xrInstance, "xrGetVulkanGraphicsRequirementsKHR",
@@ -306,6 +310,7 @@ void VulkanOpenxrPlatform::LoadVulkanRequirements()
 
 void VulkanOpenxrPlatform::InitializeActions()
 {
+    SYSTRACE_CALL();
     // Create an action set
     XrActionSetCreateInfo actionSetInfo{XR_TYPE_ACTION_SET_CREATE_INFO};
     utility::strcpy_s(actionSetInfo.actionSetName, "input");
@@ -367,7 +372,7 @@ void VulkanOpenxrPlatform::InitializeActions()
 
 void VulkanOpenxrPlatform::PollEvents()
 {
-    SYSTRACE_NAME("OpenxrPlatform::PollEvents");
+    SYSTRACE_CALL();
 
     XrEventDataBuffer event{};
     while (TryReadNextEvent(&event))
@@ -446,6 +451,7 @@ bool VulkanOpenxrPlatform::TryReadNextEvent(XrEventDataBuffer* eventDataBuffer)
 SwapChainPtr VulkanOpenxrPlatform::createSwapChain(void* nativeWindow,
     uint64_t flags, VkExtent2D extent)
 {
+    SYSTRACE_CALL();
     if (flags == backend::SWAP_CHAIN_CONFIG_OPENXR_SESSION)
     {
         OpenxrSession* session = static_cast<OpenxrSession*>(nativeWindow);
@@ -523,64 +529,44 @@ void VulkanOpenxrPlatform::destroy(SwapChainPtr handle) {
 
 void OpenxrSession::PollActions()
 {
-    
+    SYSTRACE_CALL();
 }
 
-void OpenxrSession::XrBeginFrame()
+bool OpenxrSession::XrBeginFrame()
 {
-    driverApi->xrBeginFrame(0);
-}
-
-void OpenxrSession::XrEndFrame()
-{
-    driverApi->xrEndFrame(0);
-}
-
-void OpenxrSession::AsyncXrBeginFrame()
-{
-    SYSTRACE_NAME("OpenxrSession::AsyncXrBeginFrame");
-
+    SYSTRACE_CALL();
     if (sessionState == XR_SESSION_STATE_READY ||
         sessionState == XR_SESSION_STATE_SYNCHRONIZED ||
         sessionState == XR_SESSION_STATE_VISIBLE ||
-        sessionState == XR_SESSION_STATE_FOCUSED)
-    {
+        sessionState == XR_SESSION_STATE_FOCUSED) {
+        
         XrResult result;
+        XrFramePacer::State& state = pacer.NewState();
 
         // Wait for a new frame.
         XrFrameWaitInfo frameWaitInfo {XR_TYPE_FRAME_WAIT_INFO};
-        frameState = {XR_TYPE_FRAME_STATE};
-        CHK_XRCMD2(result = xrWaitFrame(xrSession, &frameWaitInfo, &frameState));
+        state.frameState = {XR_TYPE_FRAME_STATE};
+        CHK_XRCMD2(result = xrWaitFrame(xrSession, &frameWaitInfo, &state.frameState));
 
         if (result == XR_SESSION_LOSS_PENDING)
         {
             SetSessionState(XR_SESSION_STATE_LOSS_PENDING);
-            return;
-        }
-
-        // Begin frame immediately before GPU work
-        XrFrameBeginInfo frameBeginInfo {XR_TYPE_FRAME_BEGIN_INFO};
-        CHK_XRCMD2(result = xrBeginFrame(xrSession, &frameBeginInfo));
-
-        if (result == XR_SESSION_LOSS_PENDING)
-        {
-            SetSessionState(XR_SESSION_STATE_LOSS_PENDING);
-            return;
+            return false;
         }
 
         {   // Locate eyes
             XrViewLocateInfo locateInfo {XR_TYPE_VIEW_LOCATE_INFO};
             locateInfo.viewConfigurationType = 
                 XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
-            locateInfo.displayTime = frameState.predictedDisplayTime;
+            locateInfo.displayTime = state.frameState.predictedDisplayTime;
             locateInfo.space = localSpace;
 
             XrViewState viewState{XR_TYPE_VIEW_STATE};
-            views[0] = {XR_TYPE_VIEW};
-            views[1] = {XR_TYPE_VIEW};
+            state.views[0] = {XR_TYPE_VIEW};
+            state.views[1] = {XR_TYPE_VIEW};
             uint32_t count;
             CHK_XRCMD2(xrLocateViews(
-                xrSession, &locateInfo, &viewState, 2, &count, views));
+                xrSession, &locateInfo, &viewState, 2, &count, state.views));
 
             // Input* input = Input::GetInstance();
             
@@ -602,7 +588,7 @@ void OpenxrSession::AsyncXrBeginFrame()
             XrSpaceLocation lAimPoseLocation{XR_TYPE_SPACE_LOCATION};
             xrLocateSpace(
                 lAimPoseSpace, localSpace,
-                frameState.predictedDisplayTime, &lAimPoseLocation
+                state.frameState.predictedDisplayTime, &lAimPoseLocation
             );
 
             // EventLeftAimPose* eventLeftAimPose = new EventLeftAimPose();
@@ -618,7 +604,7 @@ void OpenxrSession::AsyncXrBeginFrame()
             XrSpaceLocation rAimPoseLocation{XR_TYPE_SPACE_LOCATION};
             xrLocateSpace(
                 rAimPoseSpace, localSpace,
-                frameState.predictedDisplayTime, &rAimPoseLocation
+                state.frameState.predictedDisplayTime, &rAimPoseLocation
             );
 
             // EventRightAimPose* eventRightAimPose = new EventRightAimPose();
@@ -636,7 +622,7 @@ void OpenxrSession::AsyncXrBeginFrame()
             XrSpaceLocation lGripPoseLocation{XR_TYPE_SPACE_LOCATION};
             xrLocateSpace(
                 lGripPoseSpace, localSpace,
-                frameState.predictedDisplayTime, &lGripPoseLocation
+                state.frameState.predictedDisplayTime, &lGripPoseLocation
             );
 
             // EventLeftGripPose* eventLeftGripPose = new EventLeftGripPose();
@@ -652,7 +638,7 @@ void OpenxrSession::AsyncXrBeginFrame()
             XrSpaceLocation rGripPoseLocation{XR_TYPE_SPACE_LOCATION};
             xrLocateSpace(
                 rGripPoseSpace, localSpace,
-                frameState.predictedDisplayTime, &rGripPoseLocation
+                state.frameState.predictedDisplayTime, &rGripPoseLocation
             );
 
             // EventRightGripPose* eventRightGripPose = new EventRightGripPose();
@@ -665,49 +651,106 @@ void OpenxrSession::AsyncXrBeginFrame()
             // EventQueue::GetInstance()->Publish(
             //     EventQueue::InputXR, eventRightGripPose);
         }
+
+#if FVK_ENABLED(FVK_DEBUG_OPENXR)
+        std::string report = "[XrSession] BeginSyncFrame: " + std::to_string(syncBeginID++);
+        SYSTRACE_TEXT(report.c_str());
+        utils::slog.i << report << utils::io::endl;
+#endif
+
+        driverApi->xrBeginFrame(0);
+        return true;
     }
+
+    return false;
 }
 
-void OpenxrSession::AsyncXrEndFrame()
+void OpenxrSession::XrEndFrame()
 {
-    SYSTRACE_NAME("OpenxrSession::AsyncXrEndFrame");
-
+    SYSTRACE_CALL();
     if (sessionState == XR_SESSION_STATE_READY ||
         sessionState == XR_SESSION_STATE_SYNCHRONIZED ||
         sessionState == XR_SESSION_STATE_VISIBLE ||
         sessionState == XR_SESSION_STATE_FOCUSED)
     {
-        XrResult result;
-        XrCompositionLayerProjection layer;
-        layer.type = XR_TYPE_COMPOSITION_LAYER_PROJECTION;
-        layer.next = 0;
-        layer.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
-        layer.space = localSpace;
-        layer.viewCount = 2;
-        layer.views = layerViews;
+        driverApi->xrEndFrame(0);
 
-        const XrCompositionLayerBaseHeader* pLayer =
-            reinterpret_cast<XrCompositionLayerBaseHeader*>(&layer);
+#if FVK_ENABLED(FVK_DEBUG_OPENXR)
+        std::string report = "[XrSession] EndSyncFrame: " + std::to_string(syncEndID++);
+        SYSTRACE_TEXT(report.c_str());
+        utils::slog.i << report << utils::io::endl;
+#endif
+    }
+}
 
-        XrFrameEndInfo frameEndInfo {XR_TYPE_FRAME_END_INFO};
-        frameEndInfo.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
-        frameEndInfo.displayTime = frameState.predictedDisplayTime;
-        frameEndInfo.layerCount = 1;
-        frameEndInfo.layers = &pLayer;
-        
-        CHK_XRCMD2(result = xrEndFrame(xrSession, &frameEndInfo));
+void OpenxrSession::AsyncXrBeginFrame()
+{
+    SYSTRACE_CALL();
+#if FVK_ENABLED(FVK_DEBUG_OPENXR)
+    std::string report = "[XrSession] BeginAsyncFrame: " + std::to_string(asyncBeginID++);
+    SYSTRACE_TEXT(report.c_str());
+    utils::slog.i << report << utils::io::endl;
+#endif
 
-        if (result == XR_SESSION_LOSS_PENDING)
-        {
-            SetSessionState(XR_SESSION_STATE_LOSS_PENDING);
-            return;
-        }
+    XrResult result;
+    XrFrameBeginInfo frameBeginInfo {XR_TYPE_FRAME_BEGIN_INFO};
+    CHK_XRCMD2(result = xrBeginFrame(xrSession, &frameBeginInfo));
+
+    if (result == XR_SESSION_LOSS_PENDING) {
+        SetSessionState(XR_SESSION_STATE_LOSS_PENDING);
+        return;
+    }
+}
+
+void OpenxrSession::AsyncXrEndFrame()
+{
+    SYSTRACE_CALL();
+#if FVK_ENABLED(FVK_DEBUG_OPENXR)
+    std::string report = "[XrSession] endAsync: " + std::to_string(asyncEndID++);
+    SYSTRACE_TEXT(report.c_str());
+    utils::slog.i << report << utils::io::endl;
+#endif
+
+    if (!(sessionState == XR_SESSION_STATE_READY ||
+        sessionState == XR_SESSION_STATE_SYNCHRONIZED ||
+        sessionState == XR_SESSION_STATE_VISIBLE ||
+        sessionState == XR_SESSION_STATE_FOCUSED)) {
+        return;
+    }
+
+    XrResult result;
+    XrFramePacer::State& state = pacer.GetLastState();
+
+    XrCompositionLayerProjection layer;
+    layer.type = XR_TYPE_COMPOSITION_LAYER_PROJECTION;
+    layer.next = 0;
+    layer.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
+    layer.space = localSpace;
+    layer.viewCount = 2;
+    layer.views = state.layerViews;
+
+    const XrCompositionLayerBaseHeader* pLayer =
+        reinterpret_cast<XrCompositionLayerBaseHeader*>(&layer);
+
+    XrFrameEndInfo frameEndInfo {XR_TYPE_FRAME_END_INFO};
+    frameEndInfo.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+    frameEndInfo.displayTime = state.frameState.predictedDisplayTime;
+    frameEndInfo.layerCount = 1;
+    frameEndInfo.layers = &pLayer;
+    
+    CHK_XRCMD2(result = xrEndFrame(xrSession, &frameEndInfo));
+    pacer.ReleaseLastState();
+
+    if (result == XR_SESSION_LOSS_PENDING)
+    {
+        SetSessionState(XR_SESSION_STATE_LOSS_PENDING);
+        return;
     }
 }
 
 void OpenxrSession::Initialize(VulkanOpenxrPlatform* platform, CommandStream* driverApi)
 {
-    SYSTRACE_NAME("OpenxrSession::Initialize");
+    SYSTRACE_CALL();
 
     this->platform = platform;
     this->driverApi = driverApi;
@@ -724,7 +767,7 @@ void OpenxrSession::Initialize(VulkanOpenxrPlatform* platform, CommandStream* dr
 
 void OpenxrSession::Destroy()
 {
-    SYSTRACE_NAME("OpenxrSession::Destroy");
+    SYSTRACE_CALL();
 
     assert(OpenxrSession::ShouldCloseSession());
 
@@ -742,7 +785,7 @@ void OpenxrSession::Destroy()
 
 void OpenxrSession::InitializeSession()
 {
-    SYSTRACE_NAME("OpenxrSession::InitializeSession");
+    SYSTRACE_CALL();
 
     XrGraphicsBindingVulkanKHR vkBinding{XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR};
     vkBinding.instance = platform->mImpl->mInstance;
@@ -777,7 +820,7 @@ void OpenxrSession::InitializeSession()
 
 void OpenxrSession::InitializeSpaces()
 {
-    SYSTRACE_NAME("OpenxrSession::InitializeSpaces");
+    SYSTRACE_CALL();
 
     uint32_t spaceCount;
     CHK_XRCMD2(xrEnumerateReferenceSpaces(xrSession, 0, &spaceCount, nullptr));
@@ -842,7 +885,7 @@ void OpenxrSession::InitializeSpaces()
 
 bool OpenxrSession::ShouldCloseSession()
 {
-    SYSTRACE_NAME("OpenxrSession::ShouldCloseSeesion");
+    SYSTRACE_CALL();
     
     if (sessionState == XR_SESSION_STATE_EXITING ||
         sessionState == XR_SESSION_STATE_LOSS_PENDING)
@@ -855,12 +898,13 @@ bool OpenxrSession::ShouldCloseSession()
 
 void OpenxrSession::RequestCloseSession()
 {
+    SYSTRACE_CALL();
     xrRequestExitSession(xrSession);
 }
 
 void OpenxrSession::SetSessionState(XrSessionState newState)
 {
-    SYSTRACE_NAME("OpenxrSession::SetSessionState");
+    SYSTRACE_CALL();
 
     static const std::vector<std::string> stateNames
     {
@@ -889,15 +933,13 @@ void OpenxrSession::SetSessionState(XrSessionState newState)
             info.primaryViewConfigurationType = 
                 XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
             CHK_XRCMD2(xrBeginSession(xrSession, &info));
-            eyeCreated = 0;
-            frameState = {XR_TYPE_FRAME_STATE};
+            pacer.Reset();
             break;
         }
         case XR_SESSION_STATE_STOPPING:
         {
             CHK_XRCMD2(xrEndSession(xrSession));
-            eyeCreated = 0;
-            frameState = {XR_TYPE_FRAME_STATE};
+            pacer.Reset();
             break;
         }
         case XR_SESSION_STATE_EXITING:
