@@ -777,7 +777,7 @@ void OpenxrSession::Destroy()
 {
     SYSTRACE_CALL();
 
-    assert(OpenxrSession::ShouldCloseSession());
+    assert(OpenxrSession::ShouldCloseSession() || sessionState == XR_SESSION_STATE_IDLE);
 
     xrDestroySpace(viewSpace);
     xrDestroySpace(localSpace);

@@ -548,7 +548,7 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
         int refreshIntervalMS = (SDL_GetDesktopDisplayMode(
             SDL_GetWindowDisplayIndex(window->mWindow), &Mode) == 0 &&
             Mode.refresh_rate != 0) ? round(1000.0 / Mode.refresh_rate) : 16;
-        // SDL_Delay(refreshIntervalMS);
+        SDL_Delay(refreshIntervalMS);
 
         Renderer* renderer = window->getRenderer();
 
