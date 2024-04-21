@@ -93,10 +93,10 @@ VulkanProgram::VulkanProgram(VkDevice device, Program const& builder) noexcept
         }
     }
 
-    #if FVK_ENABLED(FVK_DEBUG_SHADER_MODULE)
-        utils::slog.d << "Created VulkanProgram " << builder << ", shaders = (" << bundle.vertex
-                      << ", " << bundle.fragment << ")" << utils::io::endl;
-    #endif
+    // #if FVK_ENABLED(FVK_DEBUG_SHADER_MODULE)
+    //     utils::slog.d << "Created VulkanProgram " << builder << ", shaders = (" << bundle.vertex
+    //                   << ", " << bundle.fragment << ")" << utils::io::endl;
+    // #endif
 }
 
 VulkanProgram::VulkanProgram(VkDevice device, VkShaderModule vs, VkShaderModule fs,

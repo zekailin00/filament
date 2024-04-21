@@ -1721,12 +1721,12 @@ void VulkanDriver::draw(PipelineState pipelineState, Handle<HwRenderPrimitive> r
     commands->acquire(prim.indexBuffer);
     commands->acquire(prim.vertexBuffer);
 
-    // If this is a debug build, validate the current shader.
-#if FVK_ENABLED(FVK_DEBUG_SHADER_MODULE)
-    if (program->bundle.vertex == VK_NULL_HANDLE || program->bundle.fragment == VK_NULL_HANDLE) {
-        utils::slog.e << "Binding missing shader: " << program->name.c_str() << utils::io::endl;
-    }
-#endif
+//     // If this is a debug build, validate the current shader.
+// #if FVK_ENABLED(FVK_DEBUG_SHADER_MODULE)
+//     if (program->bundle.vertex == VK_NULL_HANDLE || program->bundle.fragment == VK_NULL_HANDLE) {
+//         utils::slog.e << "Binding missing shader: " << program->name.c_str() << utils::io::endl;
+//     }
+// #endif
 
     // Update the VK raster state.
     const VulkanRenderTarget* rt = mCurrentRenderPass.renderTarget;
@@ -1806,11 +1806,11 @@ void VulkanDriver::draw(PipelineState pipelineState, Handle<HwRenderPrimitive> r
         // This fallback path is very flaky because the dummy texture might not have
         // matching characteristics. (e.g. if the missing texture is a 3D texture)
         if (UTILS_UNLIKELY(texture->getPrimaryImageLayout() == VulkanLayout::UNDEFINED)) {
-#if FVK_ENABLED(FVK_DEBUG_TEXTURE)
-            utils::slog.w << "Uninitialized texture bound to '" << sampler.name.c_str() << "'";
-            utils::slog.w << " in material '" << program->name.c_str() << "'";
-            utils::slog.w << " at binding point " << +sampler.binding << utils::io::endl;
-#endif
+// #if FVK_ENABLED(FVK_DEBUG_TEXTURE)
+//             utils::slog.w << "Uninitialized texture bound to '" << sampler.name.c_str() << "'";
+//             utils::slog.w << " in material '" << program->name.c_str() << "'";
+//             utils::slog.w << " at binding point " << +sampler.binding << utils::io::endl;
+// #endif
             texture = mEmptyTexture.get();
         }
 
