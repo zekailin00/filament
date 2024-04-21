@@ -54,6 +54,7 @@
 #define FVK_DEBUG_READ_PIXELS             0x00001000
 #define FVK_DEBUG_PIPELINE_CACHE          0x00002000
 #define FVK_DEBUG_ALLOCATION              0x00004000
+#define FVK_DEBUG_OPENXR                  0x00008000
 
 // Usefaul default combinations
 #define FVK_DEBUG_EVERYTHING              0xFFFFFFFF
@@ -72,7 +73,7 @@
     FVK_DEBUG_PRINT_GROUP_MARKERS
 
 #ifndef NDEBUG
-#define FVK_DEBUG_FLAGS FVK_DEBUG_PERFORMANCE
+#define FVK_DEBUG_FLAGS (FVK_DEBUG_SYSTRACE | FVK_DEBUG_VALIDATION)
 #else
 #define FVK_DEBUG_FLAGS 0
 #endif
@@ -125,14 +126,14 @@ constexpr static const int FVK_REQUIRED_VERSION_MINOR = 1;
 // buffers that have been submitted but have not yet finished rendering. Note that Filament can
 // issue multiple commit calls in a single frame, and that we use a triple buffered swap chain on
 // some platforms.
-constexpr static const int FVK_MAX_COMMAND_BUFFERS = 10;
+constexpr static const int FVK_MAX_COMMAND_BUFFERS = 30;
 
 // Number of command buffer submissions that should occur before an unused pipeline is removed
 // from the cache.
 //
 // If this number is low, VkPipeline construction will occur frequently, which can
 // be extremely slow. If this number is high, the memory footprint will be large.
-constexpr static const int FVK_MAX_PIPELINE_AGE = 10;
+constexpr static const int FVK_MAX_PIPELINE_AGE = 30;
 
 // VulkanPipelineCache does not track which command buffers contain references to which pipelines,
 // instead it simply waits for at least FVK_MAX_COMMAND_BUFFERS submissions to occur before

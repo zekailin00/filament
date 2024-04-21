@@ -119,7 +119,7 @@ public:
     public:
         struct State {
             XrFrameState frameState{XR_TYPE_FRAME_STATE};
-            XrCompositionLayerProjectionView layerViews[2]; 
+            XrCompositionLayerProjectionView layerViews[2] = {};
             XrView views[2];
         };
 

@@ -404,7 +404,9 @@ VulkanPlatformOpenxrSwapChain::VulkanPlatformOpenxrSwapChain(
 
 VulkanPlatformOpenxrSwapChain::~VulkanPlatformOpenxrSwapChain()
 {
-    xrDestroySwapchain(mSwapchain);
+    // XrSession is destroyed before this
+    // FIXME: make session::destroy async
+    // xrDestroySwapchain(mSwapchain);
     mSession = nullptr;
 }
 

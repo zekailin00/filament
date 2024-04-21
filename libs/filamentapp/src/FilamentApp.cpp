@@ -62,6 +62,107 @@
 
 #include "generated/resources/filamentapp.h"
 
+#include <math/mat4.h>
+#include <math/vec4.h>
+
+static void PoseToMat4(
+    filament::math::mat4f& result,
+    const XrPosef& pose)
+{
+    filament::math::quatf quat {
+        pose.orientation.w,
+        pose.orientation.x,
+        pose.orientation.y,
+        pose.orientation.z,
+    };
+    filament::math::mat3f rotation(quat);
+    filament::math::vec3<float> translate {
+        pose.position.x,
+        pose.position.y,
+        pose.position.z,
+    };
+    result = filament::math::mat4f::TMat44(
+        rotation, translate
+    );
+}
+
+static void XrProjectionFov(filament::math::mat4& result,
+    filament::math::vec4<float> fov, float nearZ, float farZ)
+{
+    const float tanAngleLeft = tanf(fov[0]);
+    const float tanAngleRight = tanf(fov[1]);
+
+    const float tanAngleDown = tanf(fov[3]);
+    const float tanAngleUp = tanf(fov[2]);
+
+    const float tanAngleWidth = tanAngleRight - tanAngleLeft;
+    const float tanAngleHeight = tanAngleUp - tanAngleDown;
+
+    // Set to zero for a [0,1] Z clip space (Vulkan).
+    const float offsetZ = 0;
+
+    if (farZ <= nearZ) {
+        // place the far plane at infinity
+        result[0][0] = 2.0f / tanAngleWidth;
+        result[1][0] = 0.0f;
+        result[2][0] = (tanAngleRight + tanAngleLeft) / tanAngleWidth;
+        result[3][0] = 0.0f;
+
+        result[0][1] = 0.0f;
+        result[1][1] = 2.0f / tanAngleHeight;
+        result[2][1] = (tanAngleUp + tanAngleDown) / tanAngleHeight;
+        result[3][1] = 0.0f;
+
+        result[0][2] = 0.0f;
+        result[1][2] = 0.0f;
+        result[2][2] = -1.0f;
+        result[3][2] = -(nearZ + offsetZ);
+
+        result[0][3] = 0.0f;
+        result[1][3] = 0.0f;
+        result[2][3] = -1.0f;
+        result[3][3] = 0.0f;
+    } else {
+        // normal projection
+        result[0][0] = 2.0f / tanAngleWidth;
+        result[1][0] = 0.0f;
+        result[2][0] = (tanAngleRight + tanAngleLeft) / tanAngleWidth;
+        result[3][0] = 0.0f;
+
+        result[0][1] = 0.0f;
+        result[1][1] = 2.0f / tanAngleHeight;
+        result[2][1] = (tanAngleUp + tanAngleDown) / tanAngleHeight;
+        result[3][1] = 0.0f;
+
+        result[0][2] = 0.0f;
+        result[1][2] = 0.0f;
+        result[2][2] = -(farZ + offsetZ) / (farZ - nearZ);
+        result[3][2] = -(farZ * (nearZ + offsetZ)) / (farZ - nearZ);
+
+        result[0][3] = 0.0f;
+        result[1][3] = 0.0f;
+        result[2][3] = -1.0f;
+        result[3][3] = 0.0f;
+    }
+}
+
+static void SetXrCameraInfo(filament::Camera* camera, XrView* view)
+{
+    filament::math::mat4f transform;
+    PoseToMat4(transform, view->pose);
+    camera->setModelMatrix(transform);
+
+    filament::math::mat4 projection;
+    filament::math::vec4<float> fov {
+        view->fov.angleLeft,
+        view->fov.angleRight,
+        view->fov.angleUp,
+        view->fov.angleDown
+    };
+    XrProjectionFov(projection, fov, 0.1, 100.0);
+    camera->setCustomProjection(projection, 0.1, 100.0);
+}
+
 using namespace filament;
 using namespace filagui;
 using namespace filament::math;
@@ -485,8 +586,15 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
             SYSTRACE_NAME("OpenXR_SC_render");
             mVulkanPlatform->PollEvents();
 
-            if (mOpenxrSession->XrBeginFrame())
+            if (window->mOpenxrSession->ShouldCloseSession())
+                mClosed = true;
+
+            if (window->mOpenxrSession->XrBeginFrame())
             {
+                XrView* view = window->mOpenxrSession->GetViews();
+                SetXrCameraInfo(window->mXrCameras[0], &view[0]);
+                SetXrCameraInfo(window->mXrCameras[1], &view[1]);
+
                 renderer->beginFrame(window->mXrSwapchains[0]);
                 renderer->render(window->mXrViews[0]->getView());
                 renderer->endFrame();
@@ -495,11 +603,20 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
                 renderer->render(window->mXrViews[1]->getView());
                 renderer->endFrame();
 
-                mOpenxrSession->XrEndFrame();
+                window->mOpenxrSession->XrEndFrame();
+                mEngine->flush();
             }
         }
 #endif
     }
+
+#if defined(FILAMENT_SUPPORTS_OPENXR)
+    if (!window->mOpenxrSession->ShouldCloseSession())
+        window->mOpenxrSession->RequestCloseSession();
+
+    while(!window->mOpenxrSession->ShouldCloseSession())
+        mVulkanPlatform->PollEvents();
+#endif
 
     if (mImGuiHelper) {
         mImGuiHelper.reset();
@@ -702,14 +819,13 @@ FilamentApp::Window::Window(FilamentApp* filamentApp,
                 nativeSwapChain, filament::SwapChain::CONFIG_HAS_STENCIL_BUFFER);
 
 #if defined(FILAMENT_SUPPORTS_OPENXR)
-        mFilamentApp->mOpenxrSession =
-            mFilamentApp->mVulkanPlatform->CreateSession();
-        assert(mFilamentApp->mOpenxrSession);
+        mOpenxrSession = mFilamentApp->mVulkanPlatform->CreateSession();
+        assert(mOpenxrSession);
 
         mXrSwapchains[0] = mFilamentApp->mEngine->createSwapChain(
-            mFilamentApp->mOpenxrSession, filament::SwapChain::CONFIG_OPENXR_SESSION);
+            mOpenxrSession, filament::SwapChain::CONFIG_OPENXR_SESSION);
         mXrSwapchains[1] = mFilamentApp->mEngine->createSwapChain(
-            mFilamentApp->mOpenxrSession, filament::SwapChain::CONFIG_OPENXR_SESSION);
+            mOpenxrSession, filament::SwapChain::CONFIG_OPENXR_SESSION);
 #endif
     }
     mRenderer = mFilamentApp->mEngine->createRenderer();
@@ -763,13 +879,19 @@ FilamentApp::Window::Window(FilamentApp* filamentApp,
 
 #if defined(FILAMENT_SUPPORTS_OPENXR)
     em.create(2, mXrCameraEntities);
-    mXrCameras[0] = mFilamentApp->mEngine->createCamera(mXrCameraEntities[3]);
-    mXrCameras[1] = mFilamentApp->mEngine->createCamera(mXrCameraEntities[4]);
+    mXrCameras[0] = mFilamentApp->mEngine->createCamera(mXrCameraEntities[0]);
+    mXrCameras[1] = mFilamentApp->mEngine->createCamera(mXrCameraEntities[1]);
 
     mXrViews[0] = new CView(*mRenderer, "XR view 0");
     mXrViews[1] = new CView(*mRenderer, "XR view 1");
     mXrViews[0]->setCamera(mXrCameras[0]);
     mXrViews[1]->setCamera(mXrCameras[1]);
+
+    VkExtent2D extent = mOpenxrSession->GetExtent();
+    mXrViews[0]->setViewport({0, 0, extent.width, extent.height});
+    mXrViews[1]->setViewport({0, 0, extent.width, extent.height});
+    mXrViews[0]->getView()->setVisibleLayers(0x4, 0x4);
+    mXrViews[1]->getView()->setVisibleLayers(0x4, 0x4);
 #endif
 
     // configure the cameras
@@ -785,9 +907,25 @@ FilamentApp::Window::~Window() {
         mFilamentApp->mEngine->destroyCameraComponent(e);
         em.destroy(e);
     }
+#if defined(FILAMENT_SUPPORTS_OPENXR)
+    mFilamentApp->mEngine->destroyCameraComponent(mXrCameraEntities[0]);
+    em.destroy(mXrCameraEntities[0]);
+    mFilamentApp->mEngine->destroyCameraComponent(mXrCameraEntities[1]);
+    em.destroy(mXrCameraEntities[1]);
+
+    delete mXrViews[0];
+    delete mXrViews[1];
+#endif
     mFilamentApp->mEngine->destroy(mRenderer);
+#if defined(FILAMENT_SUPPORTS_OPENXR)
+    mFilamentApp->mEngine->destroy(mXrSwapchains[0]);
+    mFilamentApp->mEngine->destroy(mXrSwapchains[1]);
+#endif
     mFilamentApp->mEngine->destroy(mSwapChain);
     SDL_DestroyWindow(mWindow);
+#if defined(FILAMENT_SUPPORTS_OPENXR)  
+    mFilamentApp->mVulkanPlatform->DestroySession(mOpenxrSession);
+#endif
     delete mMainCameraMan;
     delete mDebugCameraMan;
 }

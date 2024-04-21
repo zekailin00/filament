@@ -687,6 +687,7 @@ void OpenxrSession::XrEndFrame()
      * dequeued asynchronously by AsyncXrEndFrame
      */
     driverApi->xrEndFrame(0);
+    driverApi->flush();
 }
 
 void OpenxrSession::AsyncXrBeginFrame()
@@ -736,6 +737,8 @@ void OpenxrSession::AsyncXrEndFrame()
         layer.space = localSpace;
         layer.viewCount = 2;
         layer.views = state.layerViews;
+        assert(state.layerViews[0].type == XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW);
+        assert(state.layerViews[1].type == XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW);
 
         const XrCompositionLayerBaseHeader* pLayer =
             reinterpret_cast<XrCompositionLayerBaseHeader*>(&layer);
