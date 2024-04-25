@@ -81,7 +81,7 @@ static void PoseToMat4(
         pose.position.y,
         pose.position.z,
     };
-    result = filament::math::mat4f::TMat44(
+    result = filament::math::mat4f(
         rotation, translate
     );
 }
@@ -577,7 +577,7 @@ void FilamentApp::run(const Config& config, SetupCallback setupCallback,
 
             } else {
                 ++mSkippedFrames;
-                printf("skipped 2d window frame: %d\n", mSkippedFrames);
+                printf("skipped 2d window frame: %zu\n", mSkippedFrames);
             }
         }
 

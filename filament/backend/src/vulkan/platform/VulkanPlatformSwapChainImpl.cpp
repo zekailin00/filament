@@ -352,8 +352,14 @@ VulkanPlatformOpenxrSwapChain::VulkanPlatformOpenxrSwapChain(
     VulkanPlatformSwapChainImpl(context, device, queue),
     mSession(session), mEye(session->GetSwapchainIndex())
 {
-    if (!SelectImageFormat(VK_FORMAT_B8G8R8A8_SRGB)) {
-        utils::slog.e << "[OpenXR] Unable to Get image format"
+    if (SelectImageFormat(VK_FORMAT_B8G8R8A8_SRGB)) {
+        utils::slog.e << "[OpenXR] Swapchain image format: VK_FORMAT_B8G8R8A8_SRGB"
+            << utils::io::endl;
+    } else if (SelectImageFormat(VK_FORMAT_B8G8R8A8_UNORM)) {
+        utils::slog.e << "[OpenXR] Swapchain image format: VK_FORMAT_B8G8R8A8_UNORM"
+            << utils::io::endl;
+    } else {
+        utils::slog.e << "[OpenXR] ERROR: Unable to get image format"
             << utils::io::endl;
         throw;
     }

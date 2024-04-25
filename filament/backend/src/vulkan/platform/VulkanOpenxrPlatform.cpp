@@ -3,6 +3,8 @@
 #include "vulkan/platform/VulkanPlatformSwapChainImpl.h"
 #include "vulkan/VulkanContext.h"
 
+#include "private/backend/CommandStream.h"
+
 #include <utils/Systrace.h>
 
 #define CHK_XRCMD(result) do {                                          \
@@ -389,6 +391,7 @@ void VulkanOpenxrPlatform::PollEvents()
                     *reinterpret_cast<const XrEventDataInstanceLossPending*>(&event);
 
                 utils::slog.i << "[OpenXR] XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING"
+                    << instanceLossPending.lossTime
                     << utils::io::endl;
                 break;
             }
@@ -665,7 +668,7 @@ bool OpenxrSession::XrBeginFrame()
         }
 
         pacer.AddNewState(state);
-        driverApi->xrBeginFrame(0);
+        static_cast<CommandStream*>(driverApi)->xrBeginFrame(0);
         return true;
     }
 
@@ -686,8 +689,8 @@ void OpenxrSession::XrEndFrame()
      * so a new frame state enqueued by XrBegineFrame can be
      * dequeued asynchronously by AsyncXrEndFrame
      */
-    driverApi->xrEndFrame(0);
-    driverApi->flush();
+    static_cast<CommandStream*>(driverApi)->xrEndFrame(0);
+    static_cast<CommandStream*>(driverApi)->flush();
 }
 
 void OpenxrSession::AsyncXrBeginFrame()
@@ -756,7 +759,7 @@ void OpenxrSession::AsyncXrEndFrame()
         SetSessionState(XR_SESSION_STATE_LOSS_PENDING);
 }
 
-void OpenxrSession::Initialize(VulkanOpenxrPlatform* platform, CommandStream* driverApi)
+void OpenxrSession::Initialize(VulkanOpenxrPlatform* platform, void* driverApi)
 {
     SYSTRACE_CALL();
 

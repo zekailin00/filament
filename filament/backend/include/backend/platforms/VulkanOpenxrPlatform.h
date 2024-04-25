@@ -9,7 +9,8 @@
 #include <filament/Engine.h>
 #include <atomic>
 #include <shared_mutex>
-#include "private\backend\CommandStream.h"
+#include <vector>
+#include <list>
 
 
 namespace filament {
@@ -90,7 +91,7 @@ private:
 
     friend OpenxrSession;
     friend FEngine;
-    CommandStream* driverApi = nullptr;
+    void* driverApi = nullptr;
 
     //--------- Actions ----------//
     XrAction lSqueezeValueAction, rSqueezeValueAction;
@@ -185,7 +186,7 @@ private:
     void InitializeSession();
     void InitializeSpaces();
 
-    void Initialize(VulkanOpenxrPlatform* platform, CommandStream* driverApi);
+    void Initialize(VulkanOpenxrPlatform* platform, void* driverApi);
     void Wait() {
         while (pacer.NumFrameQueued() != 0)
             /* wait until CMD thread flushes all frames*/;
@@ -201,7 +202,7 @@ private: // VulkanPlatformOpenxrSwapChain
 private:    
     friend VulkanOpenxrPlatform;
     VulkanOpenxrPlatform* platform = nullptr;
-    CommandStream* driverApi = nullptr; // Owned by FEngine
+    void* driverApi = nullptr; // Owned by FEngine
 
     XrSession xrSession = XR_NULL_HANDLE;
     XrFramePacer pacer;
@@ -228,4 +229,4 @@ private:
 
 }// namspace filament
 
-#endif TNT_FILAMENT_BACKEND_PLATFORMS_VULKANOPENXRPLATFORM_H
+#endif // TNT_FILAMENT_BACKEND_PLATFORMS_VULKANOPENXRPLATFORM_H
