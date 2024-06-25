@@ -249,7 +249,8 @@ void FEngine::init() {
     DriverApi& driverApi = getDriverApi();
 
 #if defined(FILAMENT_SUPPORTS_OPENXR)
-    dynamic_cast<VulkanOpenxrPlatform*>(mPlatform)->driverApi = &driverApi;
+    VulkanOpenxrPlatform* ptr = dynamic_cast<VulkanOpenxrPlatform*>(mPlatform);
+    if (ptr) ptr->driverApi = &driverApi;
 #endif
 
     mActiveFeatureLevel = std::min(mActiveFeatureLevel, driverApi.getFeatureLevel());
@@ -1093,7 +1094,6 @@ bool FEngine::destroy(const FMaterialInstance* ptr) {
     SYSTRACE_CALL();
     if (ptr == nullptr) return true;
     auto pos = mMaterialInstances.find(ptr->getMaterial());
-    assert_invariant(pos != mMaterialInstances.cend());
     if (pos != mMaterialInstances.cend()) {
         return terminateAndDestroy(ptr, pos->second);
     }

@@ -52,7 +52,7 @@ using namespace bluevk;
 
 namespace filament::backend {
 
-VulkanPlatform::ExtensionSet VulkanPlatform::getRequiredInstanceExtensions() {
+ExtensionSet VulkanPlatform::getRequiredInstanceExtensions() {
     ExtensionSet ret;
     #if defined(__APPLE__)
         ret.insert("VK_MVK_macos_surface"); // TODO: replace with VK_EXT_metal_surface
