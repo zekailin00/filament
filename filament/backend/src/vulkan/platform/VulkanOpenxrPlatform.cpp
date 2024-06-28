@@ -537,23 +537,12 @@ void VulkanOpenxrPlatform::destroy(SwapChainPtr handle) {
 void OpenxrSession::PollActions()
 {
     SYSTRACE_CALL();
-}
-
-bool OpenxrSession::XrBeginFrame()
-{
-    SYSTRACE_CALL();
-#if FVK_ENABLED(FVK_DEBUG_OPENXR)
-        std::string report = "[XrSession] BeginSyncFrame: " + std::to_string(syncBeginID++);
-        SYSTRACE_TEXT(report.c_str());
-        utils::slog.i << report << utils::io::endl;
-#endif
 
     XrResult result = XR_SUCCESS;
     XrFramePacer::State state = XrFramePacer::State();
     {   // State cannot change between session state check and API call
         std::shared_lock lock(stateNotModified);
-        if (!IsRunningSession())
-            return false;
+        if (!IsRunningSession()) return;
 
         // Wait for a new frame.
         XrFrameWaitInfo frameWaitInfo {XR_TYPE_FRAME_WAIT_INFO};
@@ -564,9 +553,9 @@ bool OpenxrSession::XrBeginFrame()
     if (result == XR_SESSION_LOSS_PENDING)
     {
         SetSessionState(XR_SESSION_STATE_LOSS_PENDING);
-        return false;
+        return;
     }
-    else
+
     {
         
         {   // Locate eyes
@@ -666,31 +655,18 @@ bool OpenxrSession::XrBeginFrame()
             // EventQueue::GetInstance()->Publish(
             //     EventQueue::InputXR, eventRightGripPose);
         }
-
-        pacer.AddNewState(state);
-        static_cast<CommandStream*>(driverApi)->xrBeginFrame(0);
-        return true;
     }
 
+    pacer.AddNewState(state);
 }
 
-void OpenxrSession::XrEndFrame()
-{
-    SYSTRACE_CALL();
-#if FVK_ENABLED(FVK_DEBUG_OPENXR)
-        std::string report = "[XrSession] EndSyncFrame: " + std::to_string(syncEndID++);
-        SYSTRACE_TEXT(report.c_str());
-        utils::slog.i << report << utils::io::endl;
-    //TODO: debug that XrBeginFrame is called
-#endif
+bool OpenxrSession::XrBeginFrame() {
+    throw;
+    return true;
+}
 
-    /*
-     * Only and must be called when XrBeginFrame returns true,
-     * so a new frame state enqueued by XrBegineFrame can be
-     * dequeued asynchronously by AsyncXrEndFrame
-     */
-    static_cast<CommandStream*>(driverApi)->xrEndFrame(0);
-    static_cast<CommandStream*>(driverApi)->flush();
+void OpenxrSession::XrEndFrame() {
+    throw;
 }
 
 void OpenxrSession::AsyncXrBeginFrame()

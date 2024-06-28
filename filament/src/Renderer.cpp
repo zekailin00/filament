@@ -36,8 +36,16 @@ void Renderer::setPresentationTime(int64_t monotonic_clock_ns) {
     downcast(this)->setPresentationTime(monotonic_clock_ns);
 }
 
-bool Renderer::beginFrame(SwapChain* swapChain, uint64_t vsyncSteadyClockTimeNano) {
-    return downcast(this)->beginFrame(downcast(swapChain), vsyncSteadyClockTimeNano);
+bool Renderer::beginFrame(uint64_t vsyncSteadyClockTimeNano) {
+    return downcast(this)->beginFrame(vsyncSteadyClockTimeNano);
+}
+
+void Renderer::setCurrentSwapchain(SwapChain* swapChain) {
+    downcast(this)->setCurrentSwapchain(downcast(swapChain));
+}
+
+void Renderer::commitCurrentSwapchain() {
+    downcast(this)->commitCurrentSwapchain();
 }
 
 void Renderer::copyFrame(SwapChain* dstSwapChain, filament::Viewport const& dstViewport,

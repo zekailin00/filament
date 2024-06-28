@@ -264,8 +264,11 @@ public:
      * @see
      * endFrame()
      */
-    bool beginFrame(SwapChain* UTILS_NONNULL swapChain,
-            uint64_t vsyncSteadyClockTimeNano = 0u);
+    bool beginFrame(uint64_t vsyncSteadyClockTimeNano = 0u);
+
+    void setCurrentSwapchain(SwapChain* UTILS_NONNULL swapChain);
+
+    void commitCurrentSwapchain();
 
     /**
      * Set the time at which the frame must be presented to the display.

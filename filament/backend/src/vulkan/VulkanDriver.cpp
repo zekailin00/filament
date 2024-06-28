@@ -288,7 +288,11 @@ void VulkanDriver::collectGarbage() {
 }
 void VulkanDriver::beginFrame(int64_t monotonic_clock_ns, uint32_t frameId) {
     SYSTRACE_CALL();
-    // Do nothing.
+#if defined(FILAMENT_SUPPORTS_OPENXR)
+    VulkanOpenxrPlatform* platform =
+        dynamic_cast<VulkanOpenxrPlatform*>(this->mPlatform);
+    if (platform) platform->GetActiveSession()->AsyncXrBeginFrame();
+#endif
 }
 
 void VulkanDriver::setFrameScheduledCallback(Handle<HwSwapChain> sch,
@@ -306,27 +310,20 @@ void VulkanDriver::endFrame(uint32_t frameId) {
     FVK_SYSTRACE_CONTEXT();
     FVK_SYSTRACE_START("endframe");
     mCommands->flush();
+#if defined(FILAMENT_SUPPORTS_OPENXR)
+    VulkanOpenxrPlatform* platform =
+        dynamic_cast<VulkanOpenxrPlatform*>(this->mPlatform);
+    if (platform) platform->GetActiveSession()->AsyncXrEndFrame();
+#endif
     collectGarbage();
     FVK_SYSTRACE_END();
 }
 
 
-void VulkanDriver::xrBeginFrame(int)
-{
-#if defined(FILAMENT_SUPPORTS_OPENXR)
-    dynamic_cast<VulkanOpenxrPlatform*>(this->mPlatform)->GetActiveSession()->AsyncXrBeginFrame();
-#else
-    PANIC_LOG("OpenXR support is not enabled.")
-#endif
+void VulkanDriver::xrBeginFrame(int) {
 }
 
-void VulkanDriver::xrEndFrame(int)
-{
-#if defined(FILAMENT_SUPPORTS_OPENXR)
-    dynamic_cast<VulkanOpenxrPlatform*>(this->mPlatform)->GetActiveSession()->AsyncXrEndFrame();
-#else
-    PANIC_LOG("OpenXR support is not enabled.")
-#endif
+void VulkanDriver::xrEndFrame(int) {
 }
 
 void VulkanDriver::flush(int) {

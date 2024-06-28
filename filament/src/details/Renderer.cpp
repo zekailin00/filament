@@ -212,9 +212,7 @@ void FRenderer::setPresentationTime(int64_t monotonic_clock_ns) {
     driver.setPresentationTime(monotonic_clock_ns);
 }
 
-bool FRenderer::beginFrame(FSwapChain* swapChain, uint64_t vsyncSteadyClockTimeNano) {
-    assert_invariant(swapChain);
-
+bool FRenderer::beginFrame(uint64_t vsyncSteadyClockTimeNano) {
     SYSTRACE_CALL();
 
     // get the timestamp as soon as possible
@@ -243,9 +241,6 @@ bool FRenderer::beginFrame(FSwapChain* swapChain, uint64_t vsyncSteadyClockTimeN
     mPreviousRenderTargets.clear();
 
     mBeginFrameInternal = {};
-
-    mSwapChain = swapChain;
-    swapChain->makeCurrent(driver);
 
     // NOTE: this makes synchronous calls to the driver
     driver.updateStreams(&driver);
@@ -294,6 +289,27 @@ bool FRenderer::beginFrame(FSwapChain* swapChain, uint64_t vsyncSteadyClockTimeN
     return false;
 }
 
+void FRenderer::setCurrentSwapchain(FSwapChain* swapChain)
+{
+    assert_invariant(swapChain);
+    FEngine& engine = mEngine;
+    FEngine::DriverApi& driver = engine.getDriverApi();
+    
+    mSwapChain = swapChain;
+    swapChain->makeCurrent(driver);
+}
+
+void FRenderer::commitCurrentSwapchain()
+{
+    FEngine& engine = mEngine;
+    FEngine::DriverApi& driver = engine.getDriverApi();
+
+    if (mSwapChain) {
+        mSwapChain->commit(driver);
+        mSwapChain = nullptr;
+    }
+}
+
 void FRenderer::endFrame() {
     SYSTRACE_CALL();
 
@@ -315,11 +331,6 @@ void FRenderer::endFrame() {
 
     mFrameInfoManager.endFrame(driver);
     mFrameSkipper.endFrame(driver);
-
-    if (mSwapChain) {
-        mSwapChain->commit(driver);
-        mSwapChain = nullptr;
-    }
 
     driver.endFrame(mFrameId);
 

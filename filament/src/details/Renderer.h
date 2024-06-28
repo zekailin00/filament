@@ -79,7 +79,11 @@ public:
     void setPresentationTime(int64_t monotonic_clock_ns);
 
     // start a frame
-    bool beginFrame(FSwapChain* swapChain, uint64_t vsyncSteadyClockTimeNano);
+    bool beginFrame(uint64_t vsyncSteadyClockTimeNano);
+
+    void setCurrentSwapchain(FSwapChain* swapChain);
+
+    void commitCurrentSwapchain();
 
     // end a frame
     void endFrame();
