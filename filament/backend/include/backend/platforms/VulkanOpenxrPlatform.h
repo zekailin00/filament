@@ -11,6 +11,7 @@
 #include <shared_mutex>
 #include <vector>
 #include <list>
+#include <map>
 
 
 namespace filament {
@@ -154,14 +155,61 @@ public:
         */
     };
 
+    struct Device
+    {
+        std::map<std::string, XrPosef> poseMap {
+            {"Left Eye",   {}},
+            {"Right Eye",  {}},
+            {"Left Aim",   {}},
+            {"Right Aim",  {}},
+            {"Left Grip",  {}},
+            {"Right Grip", {}},
+        };
+
+        std::map<std::string, XrActionStateFloat> floatMap {
+            {"Left Squeeze",  {XR_TYPE_ACTION_STATE_FLOAT}},
+            {"Right Squeeze", {XR_TYPE_ACTION_STATE_FLOAT}},
+            {"Left Trigger",  {XR_TYPE_ACTION_STATE_FLOAT}},
+            {"Right Trigger", {XR_TYPE_ACTION_STATE_FLOAT}},
+
+            {"Left Thumbstick X",  {XR_TYPE_ACTION_STATE_FLOAT}},
+            {"Right Thumbstick X", {XR_TYPE_ACTION_STATE_FLOAT}},
+            {"Left Thumbstick Y",  {XR_TYPE_ACTION_STATE_FLOAT}},
+            {"Right Thumbstick Y", {XR_TYPE_ACTION_STATE_FLOAT}},
+        };
+
+        std::map<std::string, XrActionStateBoolean> boolMap {
+            {"Left Trigger Touch",  {XR_TYPE_ACTION_STATE_BOOLEAN}},
+            {"Right Trigger Touch", {XR_TYPE_ACTION_STATE_BOOLEAN}},
+
+            {"Left Thumbstick Click",  {XR_TYPE_ACTION_STATE_BOOLEAN}},
+            {"Right Thumbstick Click", {XR_TYPE_ACTION_STATE_BOOLEAN}},
+            {"Left Thumbstick Touch",  {XR_TYPE_ACTION_STATE_BOOLEAN}},
+            {"Right Thumbstick Touch", {XR_TYPE_ACTION_STATE_BOOLEAN}},
+
+            {"Left X Click", {XR_TYPE_ACTION_STATE_BOOLEAN}},
+            {"Left X Touch", {XR_TYPE_ACTION_STATE_BOOLEAN}},
+            {"Left Y Click", {XR_TYPE_ACTION_STATE_BOOLEAN}},
+            {"Left Y Touch", {XR_TYPE_ACTION_STATE_BOOLEAN}},
+            {"Left Menu Click", {XR_TYPE_ACTION_STATE_BOOLEAN}},
+
+            {"Right A Click", {XR_TYPE_ACTION_STATE_BOOLEAN}},
+            {"Right A Touch", {XR_TYPE_ACTION_STATE_BOOLEAN}},
+            {"Right B Click", {XR_TYPE_ACTION_STATE_BOOLEAN}},
+            {"Right B Touch", {XR_TYPE_ACTION_STATE_BOOLEAN}},
+            {"Right System Click", {XR_TYPE_ACTION_STATE_BOOLEAN}},
+        };
+    };
+
 public:
     void SetSessionState(XrSessionState newState);
     bool ShouldCloseSession();
     bool IsRunningSession();
     void RequestCloseSession();
 
-    void PollActions();
+    void SyncFrame();
     XrView* GetViews() {return pacer.GetCurrState().views;}
+    Device& GetDevice() {return device;}
     VkExtent2D GetExtent() {return platform->extent;}
 
     bool XrBeginFrame();
@@ -185,6 +233,7 @@ private:
     // Helper methods called by Initialize()
     void InitializeSession();
     void InitializeSpaces();
+    void PollAction(XrFramePacer::State& state);
 
     void Initialize(VulkanOpenxrPlatform* platform, void* driverApi);
     void Wait() {
@@ -208,6 +257,7 @@ private:
     XrFramePacer pacer;
     std::atomic<XrSessionState> sessionState = XR_SESSION_STATE_UNKNOWN;
     mutable std::shared_mutex stateNotModified;
+    Device device;
 
     XrSpace viewSpace = VK_NULL_HANDLE;
     XrSpace localSpace = VK_NULL_HANDLE;

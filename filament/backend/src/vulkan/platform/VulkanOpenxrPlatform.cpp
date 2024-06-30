@@ -534,7 +534,110 @@ void VulkanOpenxrPlatform::destroy(SwapChainPtr handle) {
     }
 }
 
-void OpenxrSession::PollActions()
+void OpenxrSession::PollAction(XrFramePacer::State& state)
+{ 
+    {   // Locate eyes
+        XrViewLocateInfo locateInfo {XR_TYPE_VIEW_LOCATE_INFO};
+        locateInfo.viewConfigurationType = 
+            XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+        locateInfo.displayTime = state.frameState.predictedDisplayTime;
+        locateInfo.space = localSpace;
+
+        XrViewState viewState{XR_TYPE_VIEW_STATE};
+        state.views[0] = {XR_TYPE_VIEW};
+        state.views[1] = {XR_TYPE_VIEW};
+        uint32_t count;
+        CHK_XRCMD2(xrLocateViews(
+            xrSession, &locateInfo, &viewState, 2, &count, state.views));
+        device.poseMap["Left Eye"] = state.views[0].pose;
+        device.poseMap["Right Eye"] = state.views[1].pose;
+    }
+
+    {   // Locate hand aims
+        XrSpaceLocation lAimPoseLocation{XR_TYPE_SPACE_LOCATION};
+        xrLocateSpace(
+            lAimPoseSpace, localSpace,
+            state.frameState.predictedDisplayTime, &lAimPoseLocation
+        );
+        XrSpaceLocation rAimPoseLocation{XR_TYPE_SPACE_LOCATION};
+        xrLocateSpace(
+            rAimPoseSpace, localSpace,
+            state.frameState.predictedDisplayTime, &rAimPoseLocation
+        );
+
+        device.poseMap["Left Aim"] = lAimPoseLocation.pose;
+        device.poseMap["Right Aim"] = rAimPoseLocation.pose;
+    }
+
+    {   // Locate hand grips
+        XrSpaceLocation lGripPoseLocation{XR_TYPE_SPACE_LOCATION};
+        xrLocateSpace(
+            lGripPoseSpace, localSpace,
+            state.frameState.predictedDisplayTime, &lGripPoseLocation
+        );
+        XrSpaceLocation rGripPoseLocation{XR_TYPE_SPACE_LOCATION};
+        xrLocateSpace(
+            rGripPoseSpace, localSpace,
+            state.frameState.predictedDisplayTime, &rGripPoseLocation
+        );
+
+        device.poseMap["Left Grip"] = lGripPoseLocation.pose;
+        device.poseMap["Right Grip"] = rGripPoseLocation.pose;
+    }
+
+    {
+        XrActiveActionSet activeActionSet{platform->inputActionSet, XR_NULL_PATH};
+        XrActionsSyncInfo syncInfo{XR_TYPE_ACTIONS_SYNC_INFO};
+        syncInfo.countActiveActionSets = 1;
+        syncInfo.activeActionSets = &activeActionSet;
+        CHK_XRCMD2(xrSyncActions(xrSession, &syncInfo));
+
+        XrActionStateGetInfo getInfo{XR_TYPE_ACTION_STATE_GET_INFO};
+
+#define GET_ACTION_FLOAT(var, name)                                                     \
+    getInfo.action = platform->var##Action;                                             \
+    CHK_XRCMD2(xrGetActionStateFloat(xrSession, &getInfo, &device.floatMap[name]))
+
+#define GET_ACTION_BOOLEAN(var, name)                                                   \
+    getInfo.action = platform->var##Action;                                             \
+    CHK_XRCMD2(xrGetActionStateBoolean(xrSession, &getInfo, &device.boolMap[name]))
+
+        GET_ACTION_FLOAT(lSqueezeValue, "Left Squeeze");
+        GET_ACTION_FLOAT(rSqueezeValue, "Right Squeeze");
+        GET_ACTION_FLOAT(lTriggerValue, "Left Trigger");
+        GET_ACTION_FLOAT(rTriggerValue, "Right Trigger");
+
+        GET_ACTION_FLOAT(lThumbstickX, "Left Thumbstick X");
+        GET_ACTION_FLOAT(rThumbstickX, "Right Thumbstick X");
+        GET_ACTION_FLOAT(lThumbstickY, "Left Thumbstick Y");
+        GET_ACTION_FLOAT(rThumbstickY, "Right Thumbstick Y");
+
+        GET_ACTION_BOOLEAN(lTriggerTouch, "Left Trigger Touch");
+        GET_ACTION_BOOLEAN(rTriggerTouch, "Right Trigger Touch");
+
+        GET_ACTION_BOOLEAN(lThumbstickClick, "Left Thumbstick Click");
+        GET_ACTION_BOOLEAN(rThumbstickClick, "Right Thumbstick Click");
+        GET_ACTION_BOOLEAN(lThumbstickTouch, "Left Thumbstick Touch");
+        GET_ACTION_BOOLEAN(rThumbstickTouch, "Right Thumbstick Touch");
+
+        GET_ACTION_BOOLEAN(lXClick, "Left X Click");
+        GET_ACTION_BOOLEAN(lXTouch, "Left X Touch");
+        GET_ACTION_BOOLEAN(lYClick, "Left Y Click");
+        GET_ACTION_BOOLEAN(lYTouch, "Left Y Touch");
+        GET_ACTION_BOOLEAN(lMenuClick, "Left Menu Click");
+
+        GET_ACTION_BOOLEAN(rAClick, "Right A Click");
+        GET_ACTION_BOOLEAN(rATouch, "Right A Touch");
+        GET_ACTION_BOOLEAN(rBClick, "Right B Click");
+        GET_ACTION_BOOLEAN(rBTouch, "Right B Touch");
+        GET_ACTION_BOOLEAN(rSystemClick, "Right System Click");
+
+#undef GET_ACTION_FLOAT
+#undef GET_ACTION_BOOLEAN
+    }
+}
+
+void OpenxrSession::SyncFrame()
 {
     SYSTRACE_CALL();
 
@@ -556,107 +659,7 @@ void OpenxrSession::PollActions()
         return;
     }
 
-    {
-        
-        {   // Locate eyes
-            XrViewLocateInfo locateInfo {XR_TYPE_VIEW_LOCATE_INFO};
-            locateInfo.viewConfigurationType = 
-                XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
-            locateInfo.displayTime = state.frameState.predictedDisplayTime;
-            locateInfo.space = localSpace;
-
-            XrViewState viewState{XR_TYPE_VIEW_STATE};
-            state.views[0] = {XR_TYPE_VIEW};
-            state.views[1] = {XR_TYPE_VIEW};
-            uint32_t count;
-            CHK_XRCMD2(xrLocateViews(
-                xrSession, &locateInfo, &viewState, 2, &count, state.views));
-
-            // Input* input = Input::GetInstance();
-            
-            // input->xr_left_eye_fov =
-            //     *reinterpret_cast<glm::vec4*>(&views[0].fov);
-            // input->xr_right_eye_fov =
-            //     *reinterpret_cast<glm::vec4*>(&views[1].fov);
-            // input->xr_left_eye_pos = 
-            //     *reinterpret_cast<glm::vec3*>(&views[0].pose.position);
-            // input->xr_right_eye_pos = 
-            //     *reinterpret_cast<glm::vec3*>(&views[1].pose.position);
-            // input->xr_left_eye_quat = 
-            //     *reinterpret_cast<glm::vec4*>(&views[0].pose.orientation);
-            // input->xr_right_eye_quat = 
-            //     *reinterpret_cast<glm::vec4*>(&views[1].pose.orientation);
-        }
-
-        {   // Locate hand aims
-            XrSpaceLocation lAimPoseLocation{XR_TYPE_SPACE_LOCATION};
-            xrLocateSpace(
-                lAimPoseSpace, localSpace,
-                state.frameState.predictedDisplayTime, &lAimPoseLocation
-            );
-
-            // EventLeftAimPose* eventLeftAimPose = new EventLeftAimPose();
-            // math::XrToTransform(
-            //     eventLeftAimPose->transform,
-            //     reinterpret_cast<glm::vec4*>(&lAimPoseLocation.pose.orientation),
-            //     reinterpret_cast<glm::vec3*>(&lAimPoseLocation.pose.position)
-            // );
-
-            // EventQueue::GetInstance()->Publish(
-            //     EventQueue::InputXR, eventLeftAimPose);
-
-            XrSpaceLocation rAimPoseLocation{XR_TYPE_SPACE_LOCATION};
-            xrLocateSpace(
-                rAimPoseSpace, localSpace,
-                state.frameState.predictedDisplayTime, &rAimPoseLocation
-            );
-
-            // EventRightAimPose* eventRightAimPose = new EventRightAimPose();
-            // math::XrToTransform(
-            //     eventRightAimPose->transform,
-            //     reinterpret_cast<glm::vec4*>(&rAimPoseLocation.pose.orientation),
-            //     reinterpret_cast<glm::vec3*>(&rAimPoseLocation.pose.position)
-            // );
-
-            // EventQueue::GetInstance()->Publish(
-            //     EventQueue::InputXR, eventRightAimPose);
-        }
-
-        {   // Locate hand grips
-            XrSpaceLocation lGripPoseLocation{XR_TYPE_SPACE_LOCATION};
-            xrLocateSpace(
-                lGripPoseSpace, localSpace,
-                state.frameState.predictedDisplayTime, &lGripPoseLocation
-            );
-
-            // EventLeftGripPose* eventLeftGripPose = new EventLeftGripPose();
-            // math::XrToTransform(
-            //     eventLeftGripPose->transform,
-            //     reinterpret_cast<glm::vec4*>(&lGripPoseLocation.pose.orientation),
-            //     reinterpret_cast<glm::vec3*>(&lGripPoseLocation.pose.position)
-            // );
-
-            // EventQueue::GetInstance()->Publish(
-            //     EventQueue::InputXR, eventLeftGripPose);
-
-            XrSpaceLocation rGripPoseLocation{XR_TYPE_SPACE_LOCATION};
-            xrLocateSpace(
-                rGripPoseSpace, localSpace,
-                state.frameState.predictedDisplayTime, &rGripPoseLocation
-            );
-
-            // EventRightGripPose* eventRightGripPose = new EventRightGripPose();
-            // math::XrToTransform(
-            //     eventRightGripPose->transform,
-            //     reinterpret_cast<glm::vec4*>(&rGripPoseLocation.pose.orientation),
-            //     reinterpret_cast<glm::vec3*>(&rGripPoseLocation.pose.position)
-            // );
-
-            // EventQueue::GetInstance()->Publish(
-            //     EventQueue::InputXR, eventRightGripPose);
-        }
-    }
-
+    PollAction(state);
     pacer.AddNewState(state);
 }
 
