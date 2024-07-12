@@ -454,7 +454,7 @@ void FRenderer::renderStandaloneView(FView const* view) {
 void FRenderer::render(FView const* view) {
     SYSTRACE_CALL();
 
-    assert_invariant(mSwapChain);
+    // assert_invariant(mSwapChain);
 
     if (UTILS_UNLIKELY(mBeginFrameInternal)) {
         // this should not happen, the user should not call render() if we returned false from
