@@ -60,6 +60,11 @@ public:
     explicit NameComponentManager(EntityManager& em);
     ~NameComponentManager();
 
+    static NameComponentManager* get() {
+        static NameComponentManager manager{EntityManager::get()};
+        return &manager;
+    }
+
     /**
      * Checks if the given entity already has a name component.
      */
